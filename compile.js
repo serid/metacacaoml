@@ -1,5 +1,7 @@
 import { dbg, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, it, unshiftYield, map, join } from './util.js';
 
+import { spawn, Spsc, BufferedChRcvr } from './stream.js';
+
 function isPrefix(s, i, w) {
   if (w.length > s.length - i) return false
   for (let j = 0; j < w.length; j++)
@@ -198,7 +200,9 @@ export class Syntax {
 }
 
 class Codegen {
-  constructor() {
+  constructor(as, ch) {
+    this.as = as
+    this.ch = ch
     this.code = ""
     this.nextVar = 0
   }
@@ -213,8 +217,8 @@ class Codegen {
     return ix
   }
   
-*expr() {
-  let ins = yield
+async expr() {
+  let ins = await this.ch.recv()
   switch (ins.tag) {
   case Syntax.native:
     return this.emitSsa(ins.code)
@@ -223,9 +227,10 @@ class Codegen {
   case Syntax.app:
     let ixs = []
     while (true) {
-    let ins = yield
+    let ins = await this.ch.recv()
     if (ins.tag === Syntax.endapp) break
-    ixs.push(yield* unshiftYield(this.expr(), ins))
+    this.ch.unshift(ins)
+    ixs.push(await this.expr())
     }
     let fun = ixs.shift()
     return this.emitSsa(`${fun}(${join(it(ixs))})`) 
@@ -234,17 +239,17 @@ class Codegen {
   }
 }
   
-*codegen() {
+async codegen() {
   while (true) {
-  let ins = yield
+  let ins = await this.ch.recv()
   //write(ins)
   switch (ins.tag) {
   case Syntax.fun:
     const bs = map(ins.bs, ({name}) => name)
     this.code += `function ${ins.name}(${join(bs, ", ")}) {\n`
     
-    let retIx = yield* this.expr()
-    assertEq((yield).tag, Syntax.endfun)
+    let retIx = await this.expr()
+    assertEq((await this.ch.recv()).tag, Syntax.endfun)
     
     this.code += `  return ${retIx}\n}\n`
     this.nextVar = 0
@@ -259,8 +264,9 @@ class Codegen {
 }
 
 class Tyck {
-  constructor(as) {
+  constructor(as, ch) {
     this.as = as
+    this.ch = ch
     this.globals = {}
     this.ctx = []
   }
@@ -277,8 +283,8 @@ substitute(ty) {
   }
 }
   
-*infer() {
-  let ins = yield
+async infer() {
+  let ins = await this.ch.recv()
   write("infer", ins)
   switch (ins.tag) {
   case Syntax.native:
@@ -288,29 +294,32 @@ substitute(ty) {
     assertL(ix !== -1, () => "var not found " + this.compiler.errorAt(ins.span))
     return this.ctx[ix].type
   case Syntax.app:
-    let ins2 = yield
+    let ins2 = await this.ch.recv()
     write("infer app", ins2)
     if (ins2.tag === Syntax.endapp)
       return
-    let fty = yield+ unshiftYield(this.infer(), ins2)
+    this.ch.unshift(ins2)
+    let fty = await this.infer()
     write(fty)
-    let aty = yield+ this.infer()
-    assert(dbg(yield).tag === Syntax.endapp)
-    return
+    let aty = await this.infer()
+    assert(dbg(await this.ch.recv()).tag === Syntax.endapp)
+    return fty
   default:
     nonExhaustiveMatch(ins.tag)
   }
 }
   
-*check(ty) {
-  let ins = yield
+async check(ty) {
+  let ins = await this.ch.recv()
   write("check", ty, ins)
   switch (ins.tag) {
   case Syntax.native:
     return
   case Syntax.use:
   case Syntax.app:
-    let ty2 = yield* unshiftYield(this.infer(), ins) 
+    this.ch.unshift(ins)
+    let ty2 = await this.infer()
+    write(ty2)
     assert(ty === ty2)
     return
   default:
@@ -318,9 +327,9 @@ substitute(ty) {
   }
 }
   
-*tyck() {
+async tyck() {
   while (true) {
-  let ins = yield
+  let ins = await this.ch.recv()
   switch (ins.tag) {
   case Syntax.fun:
     this.globals[ins.name] = {gs: ins.gs, bs: ins.bs.map(x => x.type), retT: ins.retT}
@@ -329,8 +338,8 @@ substitute(ty) {
     for (let {name, type} of ins.bs)
       this.ctx.push({tag: "var", name, type})
     
-    yield* this.check(ins.retT)
-    assertEq((yield).tag, Syntax.endfun)
+    await this.check(ins.retT)
+    assertEq((await this.ch.recv()).tag, Syntax.endfun)
     
     // check if all evars are solved? no
     //assert(this.ctx.)
@@ -350,18 +359,17 @@ class Analysis {
     this.compiler = compiler
   }
   
-  analyze(ss) {
-    let tyck = new Tyck(this).tyck()
-    let cg = new Codegen().codegen()
-    step(tyck)
-    step(cg)
-    let code = undefined
-    for (let i of ss) {
+  async analyze(ss) {
+    let a = new Spsc()
+    let b = new Spsc()
+    let tyck = new Tyck(this, new BufferedChRcvr(a)).tyck()
+    let cg = new Codegen(this, new BufferedChRcvr(b)).codegen()
+    spawn(async () => { for (let i of ss) {
       write("analyze", i)
-      tyck.next(i)
-      code = cg.next(i).value
-    }
-    assert(code !== undefined)
+      await a.send(i)
+      await b.send(i)
+    }})
+    let [_, code] = await Promise.all([tyck, cg])
     return code
   }
 }
@@ -375,7 +383,7 @@ export class Compiler {
     return `at "${this.src.substring(span, span + 7)}"`
   }
   
-  compile() {
-    return new Analysis(this).analyze(new Syntax(this).syntax())
+  async compile() {
+    return await new Analysis(this).analyze(new Syntax(this).syntax())
   }
 }

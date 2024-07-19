@@ -81,15 +81,32 @@ export class Spsc {
   }
 }
 
+export class BufferedChRcvr {
+  constructor(ch) {
+    this.v = ch
+    this.stack = []
+  }
+  
+  unshift(x) {
+    this.stack.push(x)
+  }
+  
+  async recv() {
+    if (this.stack.length <= 0)
+      return await this.v.recv()
+    return this.stack.pop()
+  }
+}
+
 export function tee(ch, f, g) {
   let ch1 = new Spsc()
   let ch2 = new Spsc()
   let a = f(ch1)
   let b = g(ch2)
   spawn(async () => { while (true) {
-    let x = await ch.read()
-    await a.write(x)
-    await b.write(x)
+    let x = await ch.recv()
+    await a.send(x)
+    await b.send(x)
   }})
   return Promise.all([a, b])
 }

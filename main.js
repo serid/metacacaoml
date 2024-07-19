@@ -15,4 +15,4 @@ fun let<A B>(x: A, f: [A]B): B = (f x)`
 console.log(`Src: ${src}\n`)
 let c = new Compiler(src)
 //write([...new Syntax(c).syntax()])
-console.log(`Obj: ${c.compile()}`)
+console.log(`Obj: ${await c.compile()}`)
