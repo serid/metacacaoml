@@ -1,13 +1,18 @@
+export function error(e) {
+  throw new Error(e)
+}
+
 export function assert(b, e) {
-  if (!b) throw new Error(e) 
+  if (!b) error(e) 
 }
 
 export function assertL(b, le) {
-  if (!b) throw new Error(le())
+  if (!b) error(le())
 }
 
 export function assertEq(x, y) {
   assertL(x === y, () => `found ${toString(x)}, expected ${toString(y)}`)
+  return x
 }
 
 export function toString(o) {
@@ -45,7 +50,7 @@ export function dbg(o) {
 }
 
 export function nonExhaustiveMatch(o, at) {
-  throw new Error("unhandled branch: " + toString(o))
+  error("unhandled branch: " + toString(o))
 }
 
 
@@ -100,6 +105,20 @@ export function* it(array) {
   for (let x of array) yield x
 }
 
+export function findUniqueIndex(xs, f) {
+  let ri = -1
+  for (var i = 0; i < xs.length; i++)
+    if (f(xs[i])) {
+      ri = i
+      break
+    }
+  if (ri === -1)
+    return ri
+  for (var i = ri + 1; i < xs.length; i++)
+    if (f(xs[i])) error("not unique")
+  return ri
+}
+
 export function* map(i, f) {
   for (let x of i) yield f(x)
 }
@@ -130,7 +149,7 @@ class Fuel {
   }
   
   step() {
-    if (--this.x === 0) throw new Error("all out of fuel")
+    if (--this.x === 0) error("all out of fuel")
   }
 }
 

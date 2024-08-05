@@ -1,6 +1,30 @@
-import { dbg, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, it, unshiftYield, map, join } from './util.js';
+import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, it, findUniqueIndex, map, join } from './util.js';
 
 import { spawn, Spsc, BufferedChRcvr } from './stream.js';
+
+function typeToString(ty) {
+  switch (ty.tag) {
+    case "any":
+      return "any"
+    case "var":
+      return ty.name
+    case "evar":
+      return "?" + ty.name
+    case "arrow":
+      return `[${join(map(ty.domain, typeToString), " ")}]` + typeToString(ty.codomain)
+    default:
+      nonExhaustiveMatch(ty.tag)
+  }
+}
+
+function mkType(o) {
+  Object.setPrototypeOf(o, {
+    toString() {
+      return typeToString(this)
+    }
+  })
+  return o
+}
 
 function isPrefix(s, i, w) {
   if (w.length > s.length - i) return false
@@ -10,6 +34,7 @@ function isPrefix(s, i, w) {
 }
 
 export class Syntax {
+  static strlit = "strlit"
   static fun = "fun"
   static native = "native"
   static app = "app"
@@ -32,8 +57,8 @@ export class Syntax {
     assert(this.notPastEof(), "i out of bounds")
   }
   
-  errorLocation() {
-    return this.compiler.errorLocation(this.i)
+  errorAt() {
+    return this.compiler.errorAt(this.i)
   }
   
   peekWord(w) {
@@ -47,7 +72,7 @@ export class Syntax {
   }
   
   assertWord(w) {
-    assertL(this.tryWord(w), () =>  `expected "${w}" ` + this.errorLocation()) 
+    assertL(this.tryWord(w), () =>  `expected "${w}"` + this.errorAt()) 
   }
   
   peekChar() {
@@ -83,7 +108,7 @@ export class Syntax {
   
   assertIdent() {
     let id = this.ident()
-    assertL(id !== null, () => "expected ident " + this.errorLocation())
+    assertL(id !== null, () => "expected ident" + this.errorAt())
     return id
   }
   
@@ -104,7 +129,9 @@ export class Syntax {
       let codomain = this.type()
       return {tag: "arrow", domain, codomain}
     }
-    return this.assertIdent()
+    if (this.tryWord("any"))
+      return {tag: "any"}
+    return {tag: "var", name: this.assertIdent()}
   }
   
   tryAngledGenerics() {
@@ -141,6 +168,10 @@ export class Syntax {
   }
   
   *expr() {
+    if (this.tryWord('"')) {
+      yield { tag: Syntax.strlit, span: this.i, data: this.stringLiteral('"')}
+      return
+    }
     if (this.tryWord("native[|")) {
       yield {tag: Syntax.native, span: this.i, code: this.stringLiteral("|]")}
       return
@@ -161,7 +192,7 @@ export class Syntax {
       return
     }
     
-    throw Error("expected expression " + this.errorLocation())
+    error("expected expression" + this.errorAt())
   }
   
   *toplevel() {
@@ -185,7 +216,7 @@ export class Syntax {
       yield {tag: Syntax.endfun, span: this.i}
       return
     }
-    throw Error("expected toplevel " + this.errorLocation())
+    error("expected toplevel" + this.errorAt())
   }
   
   *syntax() {
@@ -200,8 +231,8 @@ export class Syntax {
 }
 
 class Codegen {
-  constructor(as, ch) {
-    this.as = as
+  constructor(c, ch) {
+    this.c = c // compiler
     this.ch = ch
     this.code = ""
     this.nextVar = 0
@@ -220,6 +251,8 @@ class Codegen {
 async expr() {
   let ins = await this.ch.recv()
   switch (ins.tag) {
+  case Syntax.strlit:
+    return `"${ins.data}"`
   case Syntax.native:
     return this.emitSsa(ins.code)
   case Syntax.use:
@@ -242,7 +275,7 @@ async expr() {
 async codegen() {
   while (true) {
   let ins = await this.ch.recv()
-  //write(ins)
+  //write("cg", ins)
   switch (ins.tag) {
   case Syntax.fun:
     const bs = map(ins.bs, ({name}) => name)
@@ -264,22 +297,113 @@ async codegen() {
 }
 
 class Tyck {
-  constructor(as, ch) {
-    this.as = as
+  constructor(c, ch) {
+    this.c = c // compiler
     this.ch = ch
-    this.globals = {}
+    this.globals = Object.create(null)
     this.ctx = []
   }
+  
+// static map(ty)
+
+// Replace universal variables with existentials
+instantiate(vars, ty) {
+  let map = Object.create(null)
+  for (let uniName of vars) {
+    let newName = uniName
+    let predicate = x =>
+      (x.tag === "evar" || x.tag === "esolve") && x.name === newName
+    while (this.ctx.some(predicate))
+      newName += "0"
+    map[uniName] = newName
+    this.ctx.push({tag: "evar", name: newName})
+  }
+  return Tyck.instantiate0(map, ty)
+}
+
+static instantiate0(varMap, ty) {
+  write("instantiate0", varMap, ty)
+  switch (ty.tag) {
+  case "arrow":
+    return {tag: "arrow",
+      domain: ty.domain.map(this.instantiate0.bind(this, varMap)),
+      codomain: this.instantiate0(varMap, ty.codomain)
+    }
+  case "var":
+    if (varMap[ty.name] === undefined) return ty
+    return {...ty, tag: "evar"}
+  case "any":
+  case "evar":
+    return ty
+  default:
+    nonExhaustiveMatch(ty.tag)
+  }
+}
   
 // bidir.pdf: [Г]A
 substitute(ty) {
   switch (ty.tag) {
+  case "any":
   case "var":
     return ty
+  case "evar":
+    let ix = findUniqueIndex(this.ctx, ({tag, name}) => tag === "esolve" && name === ty.name)
+    
+    // evar not solved, but is it even declared? 
+    if (ix === -1)
+      ix = findUniqueIndex(this.ctx, ({tag, name}) => tag === "evar" && name === ty.name)
+    assertL(ix !== -1, () => "evar not found" + this.compiler.errorAt(ins.span))
+    return this.ctx[ix].solution !== undefined ? this.ctx[ix].solution :
+      ty
   case "arrow":
-    return {tag: "arrow"}
+    return {tag: "arrow",
+      domain: ty.domain.map(this.substitute.bind(this)),
+      codomain: this.substitute(ty.codomain)
+    }
   default:
-    nonExhaustiveMatch(ins.tag)
+    nonExhaustiveMatch(ty.tag)
+  }
+}
+
+solveEvarTo(name, value) {
+  write("solve evar", name, value)
+  assert(!this.ctx.some(
+    x => x.tag === "esolve" && x.name === name))
+
+  let ix = findUniqueIndex(this.ctx,
+    x => x.tag === "evar" && x.name === name)
+  assert(ix !== -1)
+  this.ctx[ix] = {...this.ctx[ix], tag: "esolve", value: value}
+  //todo: occurs check
+}
+
+unify(ty1, ty2) {
+  write("unify", ty1, ty2, this.ctx) 
+  if (ty1.tag === "evar") {
+    this.solveEvarTo(ty1.name, ty2)
+    return
+  }
+  if (ty2.tag === "evar") {
+    this.solveEvarTo(ty2.name, ty1)
+    return
+  }
+  if (ty1.tag === "any" || ty2.tag === "any")
+    return
+  
+  switch (ty1.tag) {
+    case "var":
+      assert(ty2.tag === "var")
+      assert(ty1.name === ty2.name)
+      break
+    case "arrow":
+      assert(ty2.tag === "arrow")
+      assert(ty1.domain.length === ty2.domain.length)
+      for (var i = 0; i < ty1.domain.length; i++)
+        this.unify(ty1.domain[i], ty2.domain[i])
+      this.unify(ty1.codomain, ty2.codomain)
+      break
+    default:
+      nonExhaustiveMatch(ty1.tag)
   }
 }
   
@@ -287,23 +411,41 @@ async infer() {
   let ins = await this.ch.recv()
   write("infer", ins)
   switch (ins.tag) {
+  case Syntax.strlit:
+    return {tag: "var", name: "String"}
   case Syntax.native:
-    return "any"
+    return {tag: "any"}
   case Syntax.use:
+    // try finding a local
     let ix = this.ctx.findLastIndex(({tag, name}) => tag === "var" && name === ins.name)
-    assertL(ix !== -1, () => "var not found " + this.compiler.errorAt(ins.span))
-    return this.ctx[ix].type
+    if (ix !== -1)
+      return this.ctx[ix].type
+    
+    // try finding a global
+    let fun = this.globals[ins.name]
+    if (fun !== undefined)
+      //todo: capture-avoiding substitution: ensure that evars emitted by inst are not present in context
+      return this.instantiate(fun.gs, {tag: "arrow", domain: fun.domain, codomain: fun.codomain}) 
+    error("var not found" + this.compiler.errorAt(ins.span))
   case Syntax.app:
-    let ins2 = await this.ch.recv()
-    write("infer app", ins2)
-    if (ins2.tag === Syntax.endapp)
-      return
-    this.ch.unshift(ins2)
-    let fty = await this.infer()
-    write(fty)
-    let aty = await this.infer()
-    assert(dbg(await this.ch.recv()).tag === Syntax.endapp)
-    return fty
+    write("infer app")
+    let fty = this.substitute(await this.infer())
+    write("fty", fty)
+    assertEq(fty.tag, "arrow") //todo evar
+    
+    let pars = fty.domain
+    for (let i = 0; i < pars.length; i++) {
+      let ins2 = await this.ch.recv()
+      if (ins2.tag === Syntax.endapp)
+        error("expected argument of type " +
+        typeToString(pars[i]) +
+        this.c.errorAt(ins2.span))
+      this.ch.unshift(ins2)
+      await this.check(pars[i])
+    }
+    
+    assertEq((await this.ch.recv()).tag, Syntax.endapp)
+    return fty.codomain
   default:
     nonExhaustiveMatch(ins.tag)
   }
@@ -315,12 +457,14 @@ async check(ty) {
   switch (ins.tag) {
   case Syntax.native:
     return
+  case Syntax.strlit:
   case Syntax.use:
   case Syntax.app:
     this.ch.unshift(ins)
     let ty2 = await this.infer()
-    write(ty2)
-    assert(ty === ty2)
+    write("inferred for check", ty2)
+    this.unify(this.substitute(ty2),
+      this.substitute(ty))
     return
   default:
     nonExhaustiveMatch(ins.tag)
@@ -330,9 +474,10 @@ async check(ty) {
 async tyck() {
   while (true) {
   let ins = await this.ch.recv()
+  //write("tyck", ins)
   switch (ins.tag) {
   case Syntax.fun:
-    this.globals[ins.name] = {gs: ins.gs, bs: ins.bs.map(x => x.type), retT: ins.retT}
+    this.globals[ins.name] = {gs: ins.gs, domain: ins.bs.map(x => x.type), codomain: ins.retT}
     for (let name of ins.gs)
       this.ctx.push({tag: "uni", name})
     for (let {name, type} of ins.bs)
@@ -346,7 +491,7 @@ async tyck() {
     this.ctx = []
     break
   case Syntax.eof:
-    break
+    return
   default:
     nonExhaustiveMatch(ins.tag)
   }
@@ -362,8 +507,8 @@ class Analysis {
   async analyze(ss) {
     let a = new Spsc()
     let b = new Spsc()
-    let tyck = new Tyck(this, new BufferedChRcvr(a)).tyck()
-    let cg = new Codegen(this, new BufferedChRcvr(b)).codegen()
+    let tyck = new Tyck(this.compiler, new BufferedChRcvr(a)).tyck()
+    let cg = new Codegen(this.compiler, new BufferedChRcvr(b)).codegen()
     spawn(async () => { for (let i of ss) {
       write("analyze", i)
       await a.send(i)
@@ -379,8 +524,8 @@ export class Compiler {
     this.src = src
   }
   
-  errorLocation(span) {
-    return `at "${this.src.substring(span, span + 7)}"`
+  errorAt(span) {
+    return ` at "${this.src.substring(span, span + 7)}"`
   }
   
   async compile() {
