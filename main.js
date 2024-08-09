@@ -1,11 +1,11 @@
 import { write, unshiftYield } from './util.js'
 import { Compiler, Syntax } from './compile.js'
 
-let src = `fun id<A>(x: A): A = x
+let src = `
 fun let<A B>(x: A, f: [A]B): B = (f x)
 fun write<A>(x: A): any = native[|console.log(x)|]
 fun main(): singleton =
-  (let "10") λx =>
+  (let "10") λx,
   (write x) 
 `
 console.log(`Src: ${src}\n`)

@@ -1,14 +1,14 @@
 import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, it, findUniqueIndex, map, join } from './util.js';
 
-import { spawn, Spsc, BufferedChRcvr } from './stream.js';
+import { spawn, Spsc, Tunguska } from './chan.js';
 
 function typeToString(ty) {
   switch (ty.tag) {
     case "any":
       return "any"
-    case "var":
+    case "use":
       return ty.name
-    case "evar":
+    case "euse":
       return "?" + ty.name
     case "arrow":
       return `[${join(map(ty.domain, typeToString), " ")}]` + typeToString(ty.codomain)
@@ -42,6 +42,7 @@ export class Syntax {
   static use = "use"
   static endfun = "endfun"
   static eof = "eof"
+  static applam = Symbol("applam")
 
   constructor(compiler) {
     this.compiler = compiler
@@ -65,14 +66,21 @@ export class Syntax {
     return isPrefix(this.s, this.i, w)
   }
   
-  tryWord(w) {
+  tryWordNoWhitespace(w) {
     if (!this.peekWord(w)) return false
     this.i += w.length
     return true
   }
   
+  tryWord(w) {
+    let b = this.tryWordNoWhitespace(w)
+    if (!b) return false
+    this.tryWhitespace()
+    return true
+  }
+  
   assertWord(w) {
-    assertL(this.tryWord(w), () =>  `expected "${w}"` + this.errorAt()) 
+    assertL(this.tryWord(w), () => `expected "${w}"` + this.errorAt()) 
   }
   
   peekChar() {
@@ -103,6 +111,7 @@ export class Syntax {
       id += c
       this.i++
     }
+    this.tryWhitespace()
     return id
   }
   
@@ -114,43 +123,41 @@ export class Syntax {
   
   stringLiteral(end) {
     let s = ""
-    while (!this.tryWord(end))
+    while (!this.tryWordNoWhitespace(end))
       s += this.char()
+    this.tryWhitespace()
     return s
   }
   
   type() {
     if (this.tryWord("[")) {
       let domain = []
-      while (!this.tryWord("]")) {
+      while (!this.tryWord("]"))
         domain.push(this.type())
-        this.tryWhitespace()
-      }
       let codomain = this.type()
       return {tag: "arrow", domain, codomain}
     }
     if (this.tryWord("any"))
       return {tag: "any"}
-    return {tag: "var", name: this.assertIdent()}
+    return {tag: "use", name: this.assertIdent()}
+  }
+  
+  idents(end) {
+    let ns = []
+    while (!this.tryWord(end))
+      ns.push(this.assertIdent())
+    return ns
   }
   
   tryAngledGenerics() {
-    let ns = []
-    if (!this.tryWord("<")) return ns
-    while (!this.tryWord(">")) {
-      ns.push(this.assertIdent())
-      this.tryWhitespace()
-    }
-    return ns
+    if (!this.tryWord("<")) return []
+    return this.idents(">")
   }
   
   binding() {
     let name = this.assertIdent()
-    this.tryWhitespace()
     this.assertWord(":")
-    this.tryWhitespace()
     let type = this.type()
-    this.tryWhitespace()
     return { name, type }
   }
   
@@ -160,9 +167,7 @@ export class Syntax {
     while (!this.tryWord(")")) {
       fuel.step()
       this.assertWord(",")
-      this.tryWhitespace()
       out.push(this.binding())
-      this.tryWhitespace()
     }
     return out
   }
@@ -178,9 +183,12 @@ export class Syntax {
     }
     if (this.tryWord("(")) {
       yield {tag: Syntax.app, span: this.i}
-      while (!this.tryWord(")")) {
+      while (!this.tryWord(")"))
         yield* this.expr()
-        this.tryWhitespace()
+      if (this.tryWord("λ")) {
+        let ps = this.idents(",")
+        yield {tag: Syntax.applam, span: this.i, ps}
+        yield* this.expr()
       }
       yield {tag: Syntax.endapp, span: this.i}
       return
@@ -198,18 +206,13 @@ export class Syntax {
   *toplevel() {
     let span = this.i
     if (this.tryWord("fun")) {
-      this.tryWhitespace()
       let name = this.assertIdent()
       let gs = this.tryAngledGenerics()
       this.assertWord("(")
       let bs = this.bindings()
-      this.tryWhitespace()
       this.assertWord(":")
-      this.tryWhitespace()
       let retT = this.type()
-      this.tryWhitespace()
       this.assertWord("=")
-      this.tryWhitespace()
     
       yield {tag: Syntax.fun, span, name, gs, bs, retT}
       yield* this.expr()
@@ -224,7 +227,6 @@ export class Syntax {
     while (this.notPastEof()) {
       fuel.step()
       yield* this.toplevel()
-      this.tryWhitespace()
     }
     yield {tag: Syntax.eof, span: this.i}
   }
@@ -262,8 +264,15 @@ async expr() {
     while (true) {
     let ins = await this.ch.recv()
     if (ins.tag === Syntax.endapp) break
-    this.ch.unshift(ins)
-    ixs.push(await this.expr())
+    if (ins.tag !== Syntax.applam) {
+      this.ch.unshift(ins)
+      ixs.push(await this.expr())
+      continue
+    }
+    // generate trailing lambda
+    ixs.push(this.emitSsa(`(${join(it(ins.ps))}) -> {`))
+    let retIx = await this.expr()
+    this.code += `  return ${retIx}\n  }\n`
     }
     let fun = ixs.shift()
     return this.emitSsa(`${fun}(${join(it(ixs))})`) 
@@ -296,7 +305,8 @@ async codegen() {
 }
 }
 
-class Tyck {
+// The typechecker
+class Huk {
   constructor(c, ch) {
     this.c = c // compiler
     this.ch = ch
@@ -308,6 +318,7 @@ class Tyck {
 
 // Replace universal variables with existentials
 instantiate(vars, ty) {
+  // generate fresh evar names
   let map = Object.create(null)
   for (let uniName of vars) {
     let newName = uniName
@@ -318,7 +329,7 @@ instantiate(vars, ty) {
     map[uniName] = newName
     this.ctx.push({tag: "evar", name: newName})
   }
-  return Tyck.instantiate0(map, ty)
+  return Huk.instantiate0(map, ty)
 }
 
 static instantiate0(varMap, ty) {
@@ -329,11 +340,11 @@ static instantiate0(varMap, ty) {
       domain: ty.domain.map(this.instantiate0.bind(this, varMap)),
       codomain: this.instantiate0(varMap, ty.codomain)
     }
-  case "var":
+  case "use":
     if (varMap[ty.name] === undefined) return ty
-    return {...ty, tag: "evar"}
+    return {...ty, tag: "euse"}
   case "any":
-  case "evar":
+  case "euse":
     return ty
   default:
     nonExhaustiveMatch(ty.tag)
@@ -344,9 +355,9 @@ static instantiate0(varMap, ty) {
 substitute(ty) {
   switch (ty.tag) {
   case "any":
-  case "var":
+  case "use":
     return ty
-  case "evar":
+  case "euse":
     let ix = findUniqueIndex(this.ctx, ({tag, name}) => tag === "esolve" && name === ty.name)
     
     // evar not solved, but is it even declared? 
@@ -365,25 +376,26 @@ substitute(ty) {
   }
 }
 
-solveEvarTo(name, value) {
-  write("solve evar", name, value)
+solveEvarTo(name, solution) {
+  write("solve evar", name, solution)
   assert(!this.ctx.some(
-    x => x.tag === "esolve" && x.name === name))
+    x => x.tag === "esolve" && x.name === name),
+    "evar already solved")
 
   let ix = findUniqueIndex(this.ctx,
     x => x.tag === "evar" && x.name === name)
   assert(ix !== -1)
-  this.ctx[ix] = {...this.ctx[ix], tag: "esolve", value: value}
+  this.ctx[ix] = {...this.ctx[ix], tag: "esolve", solution}
   //todo: occurs check
 }
 
 unify(ty1, ty2) {
   write("unify", ty1, ty2, this.ctx) 
-  if (ty1.tag === "evar") {
+  if (ty1.tag === "euse") {
     this.solveEvarTo(ty1.name, ty2)
     return
   }
-  if (ty2.tag === "evar") {
+  if (ty2.tag === "euse") {
     this.solveEvarTo(ty2.name, ty1)
     return
   }
@@ -391,8 +403,8 @@ unify(ty1, ty2) {
     return
   
   switch (ty1.tag) {
-    case "var":
-      assert(ty2.tag === "var")
+    case "use":
+      assert(ty2.tag === "use")
       assert(ty1.name === ty2.name)
       break
     case "arrow":
@@ -409,10 +421,10 @@ unify(ty1, ty2) {
   
 async infer() {
   let ins = await this.ch.recv()
-  write("infer", ins)
+  write("infer", ins, this.ctx)
   switch (ins.tag) {
   case Syntax.strlit:
-    return {tag: "var", name: "String"}
+    return {tag: "use", name: "String"}
   case Syntax.native:
     return {tag: "any"}
   case Syntax.use:
@@ -424,28 +436,55 @@ async infer() {
     // try finding a global
     let fun = this.globals[ins.name]
     if (fun !== undefined)
-      //todo: capture-avoiding substitution: ensure that evars emitted by inst are not present in context
       return this.instantiate(fun.gs, {tag: "arrow", domain: fun.domain, codomain: fun.codomain}) 
     error("var not found" + this.compiler.errorAt(ins.span))
   case Syntax.app:
     write("infer app")
-    let fty = this.substitute(await this.infer())
+    let fty = await this.infer()
     write("fty", fty)
     assertEq(fty.tag, "arrow") //todo evar
     
-    let pars = fty.domain
-    for (let i = 0; i < pars.length; i++) {
+    for (let i = 0; i < fty.domain.length; i++) {
+      // mutate the type as we iterate through it, yuppie!!! 
+      // this is necessary since context grows in information as we check arguments
+      fty = this.substitute(fty)
+      write("new fty", fty, this.ctx)
+      
+      let par = fty.domain[i]
       let ins2 = await this.ch.recv()
       if (ins2.tag === Syntax.endapp)
         error("expected argument of type " +
-        typeToString(pars[i]) +
+        typeToString(par) +
         this.c.errorAt(ins2.span))
-      this.ch.unshift(ins2)
-      await this.check(pars[i])
+      // simple application
+      if (ins2.tag !== Syntax.applam) {
+        this.ch.unshift(ins2)
+        await this.check(par)
+        continue
+      }
+      // application of trailing lambda
+      assertEq(par.tag, "arrow")
+      assert(par.domain.length === ins2.ps.length)
+      let ps = ins2.ps
+      for (var j = 0; j < par.domain.length; j++) {
+        this.ctx.push({
+          tag: "var",
+          name: ps[j],
+          type: par.domain[j]
+        })
+      }
+      await this.check(par.codomain)
+      for (let name of ps) {
+        let ix = this.ctx.findLastIndex(x =>
+          x.tag === "var" &&
+          x.name === name)
+        assert(ix >= 0)
+        this.ctx.splice(ix, 1)
+      }
     }
     
     assertEq((await this.ch.recv()).tag, Syntax.endapp)
-    return fty.codomain
+    return this.substitute(fty.codomain)
   default:
     nonExhaustiveMatch(ins.tag)
   }
@@ -453,7 +492,7 @@ async infer() {
   
 async check(ty) {
   let ins = await this.ch.recv()
-  write("check", ty, ins)
+  write("check", ins, ty)
   switch (ins.tag) {
   case Syntax.native:
     return
@@ -507,8 +546,8 @@ class Analysis {
   async analyze(ss) {
     let a = new Spsc()
     let b = new Spsc()
-    let tyck = new Tyck(this.compiler, new BufferedChRcvr(a)).tyck()
-    let cg = new Codegen(this.compiler, new BufferedChRcvr(b)).codegen()
+    let tyck = new Huk(this.compiler, new Tunguska(a)).tyck()
+    let cg = new Codegen(this.compiler, new Tunguska(b)).codegen()
     spawn(async () => { for (let i of ss) {
       write("analyze", i)
       await a.send(i)

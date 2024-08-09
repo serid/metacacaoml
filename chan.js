@@ -81,7 +81,8 @@ export class Spsc {
   }
 }
 
-export class BufferedChRcvr {
+// Wraps an Spsc to allow unshifting values
+export class Tunguska {
   constructor(ch) {
     this.v = ch
     this.stack = []
@@ -95,6 +96,12 @@ export class BufferedChRcvr {
     if (this.stack.length <= 0)
       return await this.v.recv()
     return this.stack.pop()
+  }
+  
+  async peek() {
+    if (this.stack.length <= 0)
+      this.unshift(await this.v.recv())
+    return this.stack[this.stack.length-1]
   }
 }
 
