@@ -84,7 +84,7 @@ substitute(ty) {
     // evar not solved, but is it even declared? 
     if (ix === -1)
       ix = findUniqueIndex(this.ctx, ({tag, name}) => tag === "evar" && name === ty.name)
-    assertL(ix !== -1, () => "evar not found" + this.compiler.errorAt(ins.span)) // invariant
+    assertL(ix !== -1, () => "evar not found" + this.c.errorAt(ins.span)) // invariant
     return this.ctx[ix].solution !== undefined ? this.ctx[ix].solution :
       ty
   case "arrow":
@@ -160,7 +160,7 @@ async infer() {
     let fun = this.globals[ins.name]
     if (fun !== undefined)
       return this.instantiate(fun.gs, {tag: "arrow", domain: fun.domain, codomain: fun.codomain}) 
-    error("var not found" + this.compiler.errorAt(ins.span))
+    error("var not found" + this.c.errorAt(ins.span))
   case Syntax.app:
     write("infer app")
     let fty = await this.infer()

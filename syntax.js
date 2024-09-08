@@ -67,20 +67,38 @@ export class Syntax {
     return this.s[this.i++]
   }
   
-  tryWhitespace() {
-    while (this.notPastEof() && (this.peekChar() === ' ' ||
-      this.peekChar() === '\n'))
+  tryComment() {
+    if (!this.tryWord("{")) return false
+    while (this.notPastEof() && this.peekChar() !== '}') {
+      if (!this.tryComment())
       this.i++
+    }
+    this.i++
+    return true
+  }
+  
+  tryWhitespace() {
+    while (this.notPastEof()) {
+      this.tryComment()
+      if (this.peekChar() !== ' ' &&
+        this.peekChar() !== '\n')
+        break
+      this.i++
+    }
   }
   
   ident() {
+    let rule = /[a-zA-Z0-9\-]/
     let id = ""
     if (!this.notPastEof() ||
-      !/[a-zA-Z]/.test(this.peekChar()))
+      !rule.test(this.peekChar()))
       return null
     while (this.notPastEof()) {
+      if (this.tryWord("::"))
+        id += "::"
+
       let c = this.peekChar()
-      if (!/[a-zA-Z]/.test(c))
+      if (!rule.test(c))
         break
       id += c
       this.i++

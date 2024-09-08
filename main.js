@@ -20,10 +20,15 @@ fun main(): singleton =
 await tyckTest()
 
 let src = `
+{class Option<A>
+| Some(A)
+| None()
+end}
+
 fun let<A B>(x: A, f: [A]B): B = (f x)
 fun write<A>(x: A): any = native[|console.log(x)|]
 fun main(): singleton =
-  (let "10") λx,
+  (let Option::None()) λx,
   (write x) 
 `
 console.log(`Src: ${src}\n`)
