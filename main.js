@@ -12,7 +12,7 @@ fun let<A B>(x: A, f: [A]B): B = (f x)
 
 fun write<A>(x: A): any = native[|console.log(x)|]
 fun main(): singleton =
-  (let "10") λx,
+  (let "10") λx.
   (write x)
 `).compile()
 }
@@ -20,16 +20,17 @@ fun main(): singleton =
 await tyckTest()
 
 let src = `
-{class Option<A>
-| Some(A)
+class Option<A>
 | None()
-end}
+| Some(A)
+end
 
 fun let<A B>(x: A, f: [A]B): B = (f x)
 fun write<A>(x: A): any = native[|console.log(x)|]
 fun main(): singleton =
-  (let Option::None()) λx,
-  (write x) 
+  (Option::elim (Option::None))
+  { . (write "none") }
+  { x. (write x) }
 `
 console.log(`Src: ${src}\n`)
 let c = new Compiler(src)

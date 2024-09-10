@@ -1,4 +1,4 @@
-import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, it, findUniqueIndex, map, join } from './util.js';
+import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, it, findUniqueIndex, map, filter, join } from './util.js';
 
 import { Syntax } from "./syntax.js"
 
@@ -26,7 +26,7 @@ function mkType(o) {
   return o
 }
 
-// The typechecker
+// The typechecker, named after Yenisei
 export class Huk {
   constructor(c, ch) {
     this.c = c // compiler
@@ -34,27 +34,32 @@ export class Huk {
     this.globals = Object.create(null)
     this.ctx = []
   }
-  
-// static map(ty)
+
+// invent a name like hint but not present in "taken"
+static invent(hint, taken) {
+  let name = hint
+  while (taken.includes(name))
+    name += "0"
+  return name
+}
 
 // Replace universal variables with existentials
 instantiate(vars, ty) {
   // generate fresh evar names
-  let map = Object.create(null)
+  let mapp = Object.create(null)
   for (let uniName of vars) {
-    let newName = uniName
-    let predicate = x =>
-      (x.tag === "evar" || x.tag === "esolve") && x.name === newName
-    while (this.ctx.some(predicate))
-      newName += "0"
-    map[uniName] = newName
-    this.ctx.push({tag: "evar", name: newName})
+    let taken = [...map(filter(this.ctx, x=>
+      x.tag === "evar" || x.tag === "esolve"),
+      x=>x.name)]
+    let name = Huk.invent(uniName, taken)
+    mapp[uniName] = name
+    this.ctx.push({tag: "evar", name})
   }
-  return Huk.instantiate0(map, ty)
+  return Huk.instantiate0(mapp, ty)
 }
 
 static instantiate0(varMap, ty) {
-  write("instantiate0", varMap, ty)
+  //write("instantiate0", varMap, ty)
   switch (ty.tag) {
   case "arrow":
     return {tag: "arrow",
@@ -111,7 +116,11 @@ solveEvarTo(name, solution) {
 }
 
 unify(ty1, ty2) {
-  write("unify", ty1, ty2, this.ctx) 
+  write("unify", ty1, ty2, this.ctx)
+  if (ty1.tag === "euse" &&
+    ty2.tag === "euse" &&
+    ty1.name === ty2.name)
+    return
   if (ty1.tag === "euse") {
     this.solveEvarTo(ty1.name, ty2)
     return
@@ -164,14 +173,14 @@ async infer() {
   case Syntax.app:
     write("infer app")
     let fty = await this.infer()
-    write("fty", fty)
+    write("fty", typeToString(fty))
     assertEq(fty.tag, "arrow") //todo evar
     
     for (let i = 0; i < fty.domain.length; i++) {
       // mutate the type as we iterate through it, yuppie!!! 
       // this is necessary since context grows in information as we check arguments
       fty = this.substitute(fty)
-      write("new fty", fty, this.ctx)
+      write("new fty", typeToString(fty), this.ctx)
       
       let par = fty.domain[i]
       let ins2 = await this.ch.recv()
@@ -187,7 +196,7 @@ async infer() {
       }
       // application of trailing lambda
       assertEq(par.tag, "arrow")
-      assert(par.domain.length === ins2.ps.length)
+      assertEq(par.domain.length, ins2.ps.length)
       let ps = ins2.ps
       for (var j = 0; j < par.domain.length; j++) {
         this.ctx.push({
@@ -205,7 +214,7 @@ async infer() {
         this.ctx.splice(ix, 1)
       }
     }
-    
+
     assertEq((await this.ch.recv()).tag, Syntax.endapp) // invariant
     return this.substitute(fty.codomain)
   default:
@@ -238,6 +247,19 @@ async tyck() {
   let ins = await this.ch.recv()
   //write("tyck", ins)
   switch (ins.tag) {
+  case Syntax.cls:
+    //todo: constructora should return the datatype applied eith generic params
+    for (let c of ins.cons) {
+      this.globals[ins.name+"::"+c.name] = {gs: ins.gs, domain: c.fields.map(x=>x.type), codomain: {tag: "use", name: ins.name}}
+    }
+    let ret = Huk.invent("R", ins.gs)
+    let domain = [{tag: "use", name: ins.name}].concat(ins.cons.map(c=>({tag: "arrow",
+      domain: c.fields.map(f=>f.type),
+      codomain: {tag: "use", name: ret}
+    })
+    ))
+    this.globals[ins.name+"::elim"] = {gs: ins.gs.concat([ret]), domain, codomain: {tag: "use", name: ret}}
+    break
   case Syntax.fun:
     assert(ins.annots.length <= 1)
     this.globals[ins.name] = {gs: ins.gs, domain: ins.bs.map(x => x.type), codomain: ins.retT}

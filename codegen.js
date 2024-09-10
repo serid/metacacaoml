@@ -2,6 +2,10 @@ import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaus
 
 import { Syntax } from "./syntax.js"
 
+function mangle(path) {
+  return path.replaceAll("::", "_")
+}
+
 export class Codegen {
   constructor(c, ch) {
     this.c = c // compiler
@@ -28,7 +32,7 @@ async expr() {
   case Syntax.native:
     return this.emitSsa(ins.code)
   case Syntax.use:
-    return ins.name
+    return mangle(ins.name)
   case Syntax.app:
     let ixs = []
     while (true) {
@@ -56,6 +60,20 @@ async codegen() {
   let ins = await this.ch.recv()
   //write("cg", ins)
   switch (ins.tag) {
+  case Syntax.cls:
+    let elimCode = ""
+    elimCode += `function ${ins.name}_elim(self, ${join(map(ins.cons, x=>x.name), ", ")}) {\n  switch (self.tag) {\n`
+    for (let c of ins.cons) {
+      const ps = map(c.fields, x => x.name)
+      const bs = join(ps, ", ")
+      let fullname = ins.name +"_"+ c.name
+      this.code += `function ${fullname}(${bs}) {\n`
+      this.code += `  return {tag: Symbol("${c.name}"), ${bs}}\n}\n`
+      elimCode += `  case Symbol("${c.name}"): return ${c.name}(self.${bs})\n`
+    }
+    elimCode += "  }\n}\n"
+    this.code += elimCode
+    break
   case Syntax.fun:
     const bs = map(ins.bs, ({name}) => name)
     this.code += `function ${ins.name}(${join(bs, ", ")}) {\n`

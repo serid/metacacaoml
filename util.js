@@ -105,6 +105,10 @@ export function* it(array) {
   for (let x of array) yield x
 }
 
+export function range(n) {
+  
+}
+
 export function findUniqueIndex(xs, f) {
   let ri = -1
   for (var i = 0; i < xs.length; i++)
@@ -121,6 +125,10 @@ export function findUniqueIndex(xs, f) {
 
 export function* map(i, f) {
   for (let x of i) yield f(x)
+}
+
+export function* filter(i, f) {
+  for (let x of i) if (f(x)) yield x
 }
 
 export function foldl(i, s, c) {

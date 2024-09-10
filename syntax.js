@@ -8,6 +8,7 @@ function isPrefix(s, i, w) {
 }
 
 export class Syntax {
+  static cls = Symbol("cls")
   static strlit = "strlit"
   static fun = "fun"
   static native = "native"
@@ -68,7 +69,7 @@ export class Syntax {
   }
   
   tryComment() {
-    if (!this.tryWord("{")) return false
+    if (!this.tryWord("#{")) return false
     while (this.notPastEof() && this.peekChar() !== '}') {
       if (!this.tryComment())
       this.i++
@@ -177,10 +178,21 @@ export class Syntax {
       yield {tag: Syntax.app, span: this.i}
       while (!this.tryWord(")"))
         yield* this.expr()
-      if (this.tryWord("λ")) {
-        let ps = this.idents(",")
-        yield {tag: Syntax.applam, span: this.i, ps}
-        yield* this.expr()
+      while (true) {
+        if (this.tryWord("λ")) {
+          let ps = this.idents(".")
+          yield {tag: Syntax.applam, span: this.i, ps}
+          yield* this.expr()
+          continue
+        }
+        if (this.tryWord("{")) {
+          let ps = this.idents(".")
+          yield { tag: Syntax.applam, span: this.i, ps }
+          yield* this.expr()
+          this.assertWord("}")
+          continue
+        }
+        break
       }
       yield {tag: Syntax.endapp, span: this.i}
       return
@@ -205,7 +217,30 @@ export class Syntax {
     }
 
     let span = this.i
-    if (this.tryWord("fun")) {
+    if (this.tryWord("class")) {
+      let name = this.assertIdent()
+      let gs = this.tryAngledGenerics()
+
+      let cons = []
+      while (!this.tryWord("end")) {
+        this.assertWord("|")
+        let name = this.assertIdent()
+        this.assertWord("(")
+        
+        let fields = []
+        let c = 0
+        while (!this.tryWord(")")) {
+          fields.push({
+            name: "_" + c++, 
+            type: this.type()
+          })
+        }
+        
+        cons.push({name, fields})
+      }
+      
+      yield {tag: Syntax.cls, name, gs, cons}
+    } else if (this.tryWord("fun")) {
       let name = this.assertIdent()
       let gs = this.tryAngledGenerics()
       this.assertWord("(")
@@ -217,9 +252,7 @@ export class Syntax {
       yield {tag: Syntax.fun, span, name, gs, bs, retT, annots}
       yield* this.expr()
       yield {tag: Syntax.endfun, span: this.i}
-      return
-    }
-    error("expected toplevel" + this.errorAt())
+    } else error("expected toplevel" + this.errorAt())
   }
   
   *syntax() {
