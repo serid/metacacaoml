@@ -142,27 +142,29 @@ export class Syntax {
     return ns
   }
   
-  tryAngledGenerics() {
-    if (!this.tryWord("<")) return []
-    return this.idents(">")
+  generics() {
+    let gs = []
+    while (this.tryWord("'")) {
+      gs.push(this.assertIdent())
+    }
+    return gs
   }
   
   binding() {
-    let name = this.assertIdent()
+    let name = this.ident()
+    if (name === null) return null
     this.assertWord(":")
     let type = this.type()
     return { name, type }
   }
   
   bindings() {
-    if (this.tryWord(")")) return []
-    let out = [this.binding()]
+    let bs = []
     while (!this.tryWord(")")) {
       fuel.step()
-      this.assertWord(",")
-      out.push(this.binding())
+      bs.push(this.binding())
     }
-    return out
+    return bs
   }
   
   *expr() {
@@ -219,13 +221,13 @@ export class Syntax {
     let span = this.i
     if (this.tryWord("class")) {
       let name = this.assertIdent()
-      let gs = this.tryAngledGenerics()
+      let gs = this.generics()
 
       let cons = []
       while (!this.tryWord("end")) {
         this.assertWord("|")
-        let name = this.assertIdent()
         this.assertWord("(")
+        let name = this.assertIdent()
         
         let fields = []
         let c = 0
@@ -241,9 +243,9 @@ export class Syntax {
       
       yield {tag: Syntax.cls, name, gs, cons}
     } else if (this.tryWord("fun")) {
-      let name = this.assertIdent()
-      let gs = this.tryAngledGenerics()
       this.assertWord("(")
+      let name = this.assertIdent()
+      let gs = this.generics()
       let bs = this.bindings()
       this.assertWord(":")
       let retT = this.type()
