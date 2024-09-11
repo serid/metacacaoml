@@ -3,7 +3,9 @@ import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaus
 import { Syntax } from "./syntax.js"
 
 function mangle(path) {
-  return path.replaceAll("::", "_")
+  path = path.replaceAll("::", "_")
+  path = path === "let" ? "hlet" : path
+  return path
 }
 
 export class Codegen {
@@ -44,7 +46,7 @@ async expr() {
       continue
     }
     // generate trailing lambda
-    ixs.push(this.emitSsa(`(${join(it(ins.ps))}) -> {`))
+    ixs.push(this.emitSsa(`(${join(it(ins.ps))}) => {`))
     let retIx = await this.expr()
     this.code += `  return ${retIx}\n  }\n`
     }
@@ -56,6 +58,7 @@ async expr() {
 }
   
 async codegen() {
+  this.code += `"use strict";\n`
   while (true) {
   let ins = await this.ch.recv()
   //write("cg", ins)
@@ -64,19 +67,21 @@ async codegen() {
     let elimCode = ""
     elimCode += `function ${ins.name}_elim(self, ${join(map(ins.cons, x=>x.name), ", ")}) {\n  switch (self.tag) {\n`
     for (let c of ins.cons) {
-      const ps = map(c.fields, x => x.name)
-      const bs = join(ps, ", ")
+      const ps = c.fields.map(x=>x.name)
+      const bs = join(it(ps), ", ")
       let fullname = ins.name +"_"+ c.name
       this.code += `function ${fullname}(${bs}) {\n`
-      this.code += `  return {tag: Symbol("${c.name}"), ${bs}}\n}\n`
-      elimCode += `  case Symbol("${c.name}"): return ${c.name}(self.${bs})\n`
+      this.code += `  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`
+      let as = join(map(ps, x=>"self."+x), ", ")
+      elimCode += `  case Symbol.for("${c.name}"): return ${c.name}(${as});\n`
     }
+    elimCode += `  default: throw new Error("nonexhaustive: " + self.tag.description)\n`
     elimCode += "  }\n}\n"
     this.code += elimCode
     break
   case Syntax.fun:
     const bs = map(ins.bs, ({name}) => name)
-    this.code += `function ${ins.name}(${join(bs, ", ")}) {\n`
+    this.code += `function ${mangle(ins.name)}(${join(bs, ", ")}) {\n`
     
     let retIx = await this.expr()
     assertEq((await this.ch.recv()).tag, Syntax.endfun)
@@ -85,6 +90,7 @@ async codegen() {
     this.nextVar = 0
     break
   case Syntax.eof:
+    this.code += `main()`
     return this.code
   default:
     nonExhaustiveMatch(ins.tag)

@@ -28,11 +28,15 @@ end
 fun let<A B>(x: A, f: [A]B): B = (f x)
 fun write<A>(x: A): any = native[|console.log(x)|]
 fun main(): singleton =
-  (Option::elim (Option::None))
+  (Option::elim (Option::Some "1"))
   { . (write "none") }
   { x. (write x) }
 `
 console.log(`Src: ${src}\n`)
 let c = new Compiler(src)
 //write([...new Syntax(c).syntax()])
-console.log(`Obj: ${await c.compile()}`)
+let obj = await c.compile()
+document.getElementById("out").innerText = obj
+console.log(`Obj: ${obj}`)
+console.log(`Exec:`)
+eval(obj)
