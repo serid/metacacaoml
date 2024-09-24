@@ -250,7 +250,7 @@ async tyck() {
   case Syntax.cls:
     //todo: constructora should return the datatype applied eith generic params
     for (let c of ins.cons) {
-      this.globals[ins.name+"::"+c.name] = {gs: ins.gs, domain: c.fields.map(x=>x.type), codomain: {tag: "use", name: ins.name}}
+      this.globals[ins.name+"/"+c.name] = {gs: ins.gs, domain: c.fields.map(x=>x.type), codomain: {tag: "use", name: ins.name}}
     }
     let ret = Huk.invent("R", ins.gs)
     let domain = [{tag: "use", name: ins.name}].concat(ins.cons.map(c=>({tag: "arrow",
@@ -258,7 +258,7 @@ async tyck() {
       codomain: {tag: "use", name: ret}
     })
     ))
-    this.globals[ins.name+"::elim"] = {gs: ins.gs.concat([ret]), domain, codomain: {tag: "use", name: ret}}
+    this.globals[ins.name+"/elim"] = {gs: ins.gs.concat([ret]), domain, codomain: {tag: "use", name: ret}}
     break
   case Syntax.fun:
     assert(ins.annots.length <= 1)

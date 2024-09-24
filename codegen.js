@@ -3,7 +3,7 @@ import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaus
 import { Syntax } from "./syntax.js"
 
 function mangle(path) {
-  path = path.replaceAll("::", "_")
+  path = path.replaceAll("/", "_")
   path = path === "let" ? "hlet" : path
   return path
 }

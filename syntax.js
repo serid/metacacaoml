@@ -1,4 +1,4 @@
-import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, it, findUniqueIndex, map, join } from './util.js';
+import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, getOne, it, findUniqueIndex, map, join } from './util.js';
 
 function isPrefix(s, i, w) {
   if (w.length > s.length - i) return false
@@ -69,13 +69,17 @@ export class Syntax {
   }
   
   tryComment() {
-    if (!this.tryWord("#{")) return false
-    while (this.notPastEof() && this.peekChar() !== '}') {
-      if (!this.tryComment())
+    while (true) {
+    if (this.tryWord("#{")) {
+      while (this.notPastEof() && this.peekChar() !== '}')
+        if (!this.tryComment())
+          this.i++
       this.i++
+    } else if (this.tryWord("#")) {
+      while (this.notPastEof() && this.peekChar() !== '\n') this.i++
+      this.i++
+    } else break
     }
-    this.i++
-    return true
   }
   
   tryWhitespace() {
@@ -95,8 +99,8 @@ export class Syntax {
       !rule.test(this.peekChar()))
       return null
     while (this.notPastEof()) {
-      if (this.tryWord("::"))
-        id += "::"
+      if (this.tryWord("/"))
+        id += "/"
 
       let c = this.peekChar()
       if (!rule.test(c))
@@ -122,6 +126,19 @@ export class Syntax {
     return s
   }
   
+  #type_(es) {
+    while (true) {
+    let ins = getOne(es)
+    switch (ins.tag) {
+    case Syntax.use:
+      // drops the span
+      return {tag: ins.tag, name: ins.name}
+    case Syntax.app:
+      error("todo")
+    }
+    }
+  }
+  
   type() {
     if (this.tryWord("[")) {
       let domain = []
@@ -132,7 +149,7 @@ export class Syntax {
     }
     if (this.tryWord("any"))
       return {tag: "any"}
-    return {tag: "use", name: this.assertIdent()}
+    return this.#type_(this.expr())
   }
   
   idents(end) {
