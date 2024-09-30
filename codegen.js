@@ -3,7 +3,8 @@ import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaus
 import { Syntax } from "./syntax.js"
 
 function mangle(path) {
-  path = path.replaceAll("/", "_")
+  path = path.replaceAll("/", "$")
+  path = path.replaceAll("-", "_")
   path = path === "let" ? "hlet" : path
   return path
 }
@@ -65,11 +66,11 @@ async codegen() {
   switch (ins.tag) {
   case Syntax.cls:
     let elimCode = ""
-    elimCode += `function ${ins.name}_elim(self, ${join(map(ins.cons, x=>x.name), ", ")}) {\n  switch (self.tag) {\n`
+    elimCode += `function ${ins.name}$elim(self, ${join(map(ins.cons, x=>x.name), ", ")}) {\n  switch (self.tag) {\n`
     for (let c of ins.cons) {
       const ps = c.fields.map(x=>x.name)
       const bs = join(it(ps), ", ")
-      let fullname = ins.name +"_"+ c.name
+      let fullname = ins.name +"$"+ c.name
       this.code += `function ${fullname}(${bs}) {\n`
       this.code += `  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`
       let as = join(map(ps, x=>"self."+x), ", ")
@@ -79,14 +80,20 @@ async codegen() {
     elimCode += "  }\n}\n"
     this.code += elimCode
     break
+  case Syntax.let:
+    this.code += `const ${mangle(ins.name)} = (()=>{\n`
+    let retIx = await this.expr()
+    this.code += `  return ${retIx}\n})()\n`
+    this.nextVar = 0
+    break
   case Syntax.fun:
     const bs = map(ins.bs, ({name}) => name)
     this.code += `function ${mangle(ins.name)}(${join(bs, ", ")}) {\n`
     
-    let retIx = await this.expr()
+    let retIx2 = await this.expr()
     assertEq((await this.ch.recv()).tag, Syntax.endfun)
     
-    this.code += `  return ${retIx}\n}\n`
+    this.code += `  return ${retIx2}\n}\n`
     this.nextVar = 0
     break
   case Syntax.eof:

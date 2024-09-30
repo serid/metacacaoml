@@ -30,8 +30,9 @@ end
 # Adds constructors and a matching function to global scope
 # Matching function Option/elim analyses the object in first parameter and chooses one of lambdas passed to it, while giving it the object's fields
 
-#let -check1: [(Option Int) []String [Int]String String]
-# = (Option/elim)
+#let -check1: [(Option Int) []String [Int]String]String
+let -check1: [Option []String [Int]String]String
+= Option/elim
 
 fun (write 'A x:A): any = native[|console.log(x)|]
 fun (main): singleton =
@@ -44,7 +45,7 @@ let c = new Compiler(src)
 //write([...new Syntax(c).syntax()])
 let obj = await c.compile()
 document.getElementById("out").innerText = obj
-//console.log(`Obj: ${obj}`)
+//onsole.log(`Obj: ${obj}`)
 console.log(`Src: ${src}\n`)
 console.log(`Exec:`)
 eval(obj)

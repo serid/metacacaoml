@@ -18,6 +18,7 @@ export class Syntax {
   static endfun = "endfun"
   static eof = "eof"
   static applam = Symbol("applam")
+  static let = Symbol("let")
 
   constructor(compiler) {
     this.compiler = compiler
@@ -259,6 +260,14 @@ export class Syntax {
       }
       
       yield {tag: Syntax.cls, name, gs, cons}
+    } else if (this.tryWord("let")) {
+      let name = this.assertIdent()
+      this.assertWord(":")
+      let retT = this.type()
+      this.assertWord("=")
+    
+      yield {tag: Syntax.let, span, name, retT}
+      yield* this.expr()
     } else if (this.tryWord("fun")) {
       this.assertWord("(")
       let name = this.assertIdent()

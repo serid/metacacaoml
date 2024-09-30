@@ -55,6 +55,11 @@ export function nonExhaustiveMatch(o, at) {
 
 
 
+export function mapInsert(o, key, value) {
+  assert(o[key] === undefined, "key already present")
+  o[key] = value
+}
+
 export function step(g, arg) {
   let val = g.next(arg).value
   assertL(val === undefined, () => "expected nothing, got " + toString(val))

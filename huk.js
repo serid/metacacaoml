@@ -1,4 +1,4 @@
-import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, it, findUniqueIndex, map, filter, join } from './util.js';
+import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, mapInsert, step, nextLast, it, findUniqueIndex, map, filter, join } from './util.js';
 
 import { Syntax } from "./syntax.js"
 
@@ -116,7 +116,8 @@ solveEvarTo(name, solution) {
 }
 
 unify(ty1, ty2) {
-  write("unify", ty1, ty2, this.ctx)
+  write("unify", typeToString(ty1),
+    typeToString(ty2), this.ctx)
   if (ty1.tag === "euse" &&
     ty2.tag === "euse" &&
     ty1.name === ty2.name)
@@ -142,8 +143,11 @@ unify(ty1, ty2) {
     case "arrow":
       assert(ty2.tag === "arrow")
       assert(ty1.domain.length === ty2.domain.length)
-      for (var i = 0; i < ty1.domain.length; i++)
+      for (var i = 0; i < ty1.domain.length; i++) {
         this.unify(ty1.domain[i], ty2.domain[i])
+        ty1 = this.substitute(ty1)
+        ty2 = this.substitute(ty2)
+      }
       this.unify(ty1.codomain, ty2.codomain)
       break
     default:
@@ -166,10 +170,10 @@ async infer() {
       return this.ctx[ix].type
     
     // try finding a global
-    let fun = this.globals[ins.name]
-    if (fun !== undefined)
-      return this.instantiate(fun.gs, {tag: "arrow", domain: fun.domain, codomain: fun.codomain}) 
-    error("var not found" + this.c.errorAt(ins.span))
+    let gb = this.globals[ins.name]
+    if (gb === undefined)
+      error("var not found" + this.c.errorAt(ins.span))
+    return this.instantiate(gb.gs, gb.ty)
   case Syntax.app:
     write("infer app")
     let fty = await this.infer()
@@ -250,7 +254,7 @@ async tyck() {
   case Syntax.cls:
     //todo: constructora should return the datatype applied eith generic params
     for (let c of ins.cons) {
-      this.globals[ins.name+"/"+c.name] = {gs: ins.gs, domain: c.fields.map(x=>x.type), codomain: {tag: "use", name: ins.name}}
+      mapInsert(this.globals, ins.name+"/"+c.name, {gs: ins.gs, ty: {tag: "arrow", domain: c.fields.map(x=>x.type), codomain: {tag: "use", name: ins.name}}})
     }
     let ret = Huk.invent("R", ins.gs)
     let domain = [{tag: "use", name: ins.name}].concat(ins.cons.map(c=>({tag: "arrow",
@@ -258,11 +262,17 @@ async tyck() {
       codomain: {tag: "use", name: ret}
     })
     ))
-    this.globals[ins.name+"/elim"] = {gs: ins.gs.concat([ret]), domain, codomain: {tag: "use", name: ret}}
+    mapInsert(this.globals, ins.name+"/elim", {gs: ins.gs.concat([ret]), ty: {tag: "arrow", domain, codomain: {tag: "use", name: ret}}})
+    break
+  case Syntax.let:
+    await this.check(ins.retT)
+    mapInsert(this.globals, ins.name,
+    {gs: [], ty: ins.retT})
     break
   case Syntax.fun:
     assert(ins.annots.length <= 1)
-    this.globals[ins.name] = {gs: ins.gs, domain: ins.bs.map(x => x.type), codomain: ins.retT}
+    mapInsert(this.globals, ins.name,
+    {gs: ins.gs, ty: {tag: "arrow", domain: ins.bs.map(x => x.type), codomain: ins.retT}})
     for (let name of ins.gs)
       this.ctx.push({tag: "uni", name})
     for (let {name, type} of ins.bs)
