@@ -128,15 +128,22 @@ export class Syntax {
   }
   
   #type_(es) {
-    while (true) {
     let ins = getOne(es)
     switch (ins.tag) {
     case Syntax.use:
       // drops the span
       return {tag: ins.tag, name: ins.name}
     case Syntax.app:
-      error("todo")
-    }
+      let cons = this.#type_(es)
+      let args = []
+      while (true) {
+        let arg = this.#type_(es)
+        if (arg === null) break
+        args.push(arg)
+      }
+      return {tag: "app", cons, args}
+    default:
+      return null
     }
   }
   

@@ -10,11 +10,17 @@ function typeToString(ty) {
       return ty.name
     case "euse":
       return "?" + ty.name
+    case "app":
+      return `(${typeToString(ty.cons)} ${join(map(ty.args, typeToString), " ")})`
     case "arrow":
       return `[${join(map(ty.domain, typeToString), " ")}]` + typeToString(ty.codomain)
     default:
       nonExhaustiveMatch(ty.tag)
   }
+}
+
+function mkUse(name) {
+  return {tag:"use",name}
 }
 
 function mkType(o) {
@@ -45,6 +51,7 @@ static invent(hint, taken) {
 
 // Replace universal variables with existentials
 instantiate(vars, ty) {
+  write("inst", ty)
   // generate fresh evar names
   let mapp = Object.create(null)
   for (let uniName of vars) {
@@ -61,6 +68,11 @@ instantiate(vars, ty) {
 static instantiate0(varMap, ty) {
   //write("instantiate0", varMap, ty)
   switch (ty.tag) {
+  case "app":
+    return {tag: "app",
+      cons: this.instantiate0(varMap, ty.cons),
+      args: ty.args.map(this.instantiate0.bind(this, varMap))
+    }
   case "arrow":
     return {tag: "arrow",
       domain: ty.domain.map(this.instantiate0.bind(this, varMap)),
@@ -92,6 +104,11 @@ substitute(ty) {
     assertL(ix !== -1, () => "evar not found" + this.c.errorAt(ins.span)) // invariant
     return this.ctx[ix].solution !== undefined ? this.ctx[ix].solution :
       ty
+  case "app":
+    return {tag: "app",
+      cons: this.substitute(ty.cons), 
+      args: ty.args.map(this.substitute.bind(this))
+    }
   case "arrow":
     return {tag: "arrow",
       domain: ty.domain.map(this.substitute.bind(this)),
@@ -135,10 +152,19 @@ unify(ty1, ty2) {
   
   switch (ty1.tag) {
     case "use":
-      assert(ty2.tag === "use")
-      assert(ty1.name === ty2.name,
+      assert(ty2.tag === "use" && ty1.name === ty2.name,
         `error: "${typeToString(ty1)}" is not a subtype of "${typeToString(ty2)}"` +
         this.c.errorAt())
+      break
+    case "app":
+      assertEq(ty2.tag, "app")
+      assertEq(ty1.args.length, ty2.args.length)
+      this.unify(ty1.cons, ty2.cons)
+      for (var i = 0; i < ty1.args.length; i++) {
+        this.unify(ty1.args[i], ty2.args[i])
+        ty1 = this.substitute(ty1)
+        ty2 = this.substitute(ty2)
+      }
       break
     case "arrow":
       assert(ty2.tag === "arrow")
@@ -160,7 +186,7 @@ async infer() {
   write("infer", ins, this.ctx)
   switch (ins.tag) {
   case Syntax.strlit:
-    return {tag: "use", name: "String"}
+    return mkUse("String")
   case Syntax.native:
     return {tag: "any"}
   case Syntax.use:
@@ -252,17 +278,21 @@ async tyck() {
   //write("tyck", ins)
   switch (ins.tag) {
   case Syntax.cls:
-    //todo: constructora should return the datatype applied eith generic params
+    let self = {tag: "app", 
+          cons: mkUse(ins.name),
+          args: ins.gs.map(mkUse)
+        }
     for (let c of ins.cons) {
-      mapInsert(this.globals, ins.name+"/"+c.name, {gs: ins.gs, ty: {tag: "arrow", domain: c.fields.map(x=>x.type), codomain: {tag: "use", name: ins.name}}})
+      mapInsert(this.globals, ins.name+"/"+c.name, {gs: ins.gs, ty: {tag: "arrow", domain: c.fields.map(x=>x.type), codomain: self
+      }})
     }
     let ret = Huk.invent("R", ins.gs)
-    let domain = [{tag: "use", name: ins.name}].concat(ins.cons.map(c=>({tag: "arrow",
+    let domain = [self].concat(ins.cons.map(c=>({tag: "arrow",
       domain: c.fields.map(f=>f.type),
-      codomain: {tag: "use", name: ret}
+      codomain: mkUse(ret)
     })
     ))
-    mapInsert(this.globals, ins.name+"/elim", {gs: ins.gs.concat([ret]), ty: {tag: "arrow", domain, codomain: {tag: "use", name: ret}}})
+    mapInsert(this.globals, ins.name+"/elim", {gs: ins.gs.concat([ret]), ty: {tag: "arrow", domain, codomain: mkUse(ret)}})
     break
   case Syntax.let:
     await this.check(ins.retT)

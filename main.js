@@ -30,8 +30,8 @@ end
 # Adds constructors and a matching function to global scope
 # Matching function Option/elim analyses the object in first parameter and chooses one of lambdas passed to it, while giving it the object's fields
 
-#let -check1: [(Option Int) []String [Int]String]String
-let -check1: [Option []String [Int]String]String
+let -check1: [(Option Int) []String [Int]String]String
+#let -check1: [Option []String [Int]String]String
 = Option/elim
 
 fun (write 'A x:A): any = native[|console.log(x)|]
