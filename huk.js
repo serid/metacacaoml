@@ -296,6 +296,7 @@ async tyck() {
     break
   case Syntax.let:
     await this.check(ins.retT)
+    this.ctx = []
     mapInsert(this.globals, ins.name,
     {gs: [], ty: ins.retT})
     break

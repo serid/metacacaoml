@@ -87,7 +87,7 @@ async codegen() {
     this.nextVar = 0
     break
   case Syntax.fun:
-    const bs = map(ins.bs, ({name}) => name)
+    const bs = map(ins.bs,x=>mangle(x.name))
     this.code += `function ${mangle(ins.name)}(${join(bs, ", ")}) {\n`
     
     let retIx2 = await this.expr()

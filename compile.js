@@ -6,6 +6,8 @@ import { Syntax } from "./syntax.js"
 import { Huk } from "./huk.js"
 import { Codegen } from "./codegen.js"
 
+import std from "./memlstd.js"
+
 class Analysis {
   constructor(compiler) {
     this.compiler = compiler
@@ -28,6 +30,7 @@ class Analysis {
 
 export class Compiler {
   constructor(src) {
+    src = std + src
     this.src = src
   }
   
