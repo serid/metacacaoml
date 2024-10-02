@@ -181,8 +181,8 @@ unify(ty1, ty2) {
   }
 }
   
-async infer() {
-  let ins = await this.ch.recv()
+*infer() {
+  let ins = yield*this.ch.recv()
   write("infer", ins, this.ctx)
   switch (ins.tag) {
   case Syntax.strlit:
@@ -202,7 +202,7 @@ async infer() {
     return this.instantiate(gb.gs, gb.ty)
   case Syntax.app:
     write("infer app")
-    let fty = await this.infer()
+    let fty = yield*this.infer()
     write("fty", typeToString(fty))
     assertEq(fty.tag, "arrow") //todo evar
     
@@ -213,15 +213,15 @@ async infer() {
       write("new fty", typeToString(fty), this.ctx)
       
       let par = fty.domain[i]
-      let ins2 = await this.ch.recv()
+      let ins2 = yield*this.ch.recv()
       if (ins2.tag === Syntax.endapp)
         error("expected argument of type " +
         typeToString(par) +
         this.c.errorAt(ins2.span))
       // simple application
       if (ins2.tag !== Syntax.applam) {
-        this.ch.unshift(ins2)
-        await this.check(par)
+        this.ch.send(ins2)
+        yield*this.check(par)
         continue
       }
       // application of trailing lambda
@@ -235,7 +235,7 @@ async infer() {
           type: par.domain[j]
         })
       }
-      await this.check(par.codomain)
+      yield*this.check(par.codomain)
       for (let name of ps) {
         let ix = this.ctx.findLastIndex(x =>
           x.tag === "var" &&
@@ -245,15 +245,15 @@ async infer() {
       }
     }
 
-    assertEq((await this.ch.recv()).tag, Syntax.endapp) // invariant
+    assertEq((yield*this.ch.recv()).tag, Syntax.endapp) // invariant
     return this.substitute(fty.codomain)
   default:
     nonExhaustiveMatch(ins.tag)
   }
 }
   
-async check(ty) {
-  let ins = await this.ch.recv()
+*check(ty) {
+  let ins = yield*this.ch.recv()
   write("check", ins, ty)
   switch (ins.tag) {
   case Syntax.native:
@@ -261,8 +261,8 @@ async check(ty) {
   case Syntax.strlit:
   case Syntax.use:
   case Syntax.app:
-    this.ch.unshift(ins)
-    let ty2 = await this.infer()
+    this.ch.send(ins)
+    let ty2 = yield*this.infer()
     write("inferred for check", ty2)
     this.unify(this.substitute(ty2),
       this.substitute(ty))
@@ -272,9 +272,9 @@ async check(ty) {
   }
 }
   
-async tyck() {
+*tyck() {
   while (true) {
-  let ins = await this.ch.recv()
+  let ins = yield*this.ch.recv()
   //write("tyck", ins)
   switch (ins.tag) {
   case Syntax.cls:
@@ -295,7 +295,7 @@ async tyck() {
     mapInsert(this.globals, ins.name+"/elim", {gs: ins.gs.concat([ret]), ty: {tag: "arrow", domain, codomain: mkUse(ret)}})
     break
   case Syntax.let:
-    await this.check(ins.retT)
+    yield*this.check(ins.retT)
     this.ctx = []
     mapInsert(this.globals, ins.name,
     {gs: [], ty: ins.retT})
@@ -310,16 +310,16 @@ async tyck() {
       this.ctx.push({tag: "var", name, type})
 
     if (ins.annots.length === 0)
-      await this.check(ins.retT)
+      yield*this.check(ins.retT)
     else {
       try {
-        await this.check(ins.retT)
+        yield*this.check(ins.retT)
         error("[no error]")
       } catch (e) {
         assertEq(e.message, ins.annots[0].text)
       }
     }
-    assertEq((await this.ch.recv()).tag, Syntax.endfun) // invariant
+    assertEq((yield*this.ch.recv()).tag, Syntax.endfun) // invariant
     
     // check if all evars are solved? no
     //assert(this.ctx.)

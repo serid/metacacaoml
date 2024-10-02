@@ -1,8 +1,8 @@
-import { write, unshiftYield } from './util.js'
+import { write } from './util.js'
 import { Compiler } from './compile.js'
 
-async function tyckTest() {
-await new Compiler(`
+function tyckTest() {
+new Compiler(`
 
 fun (foo): String = ""
 @Fails(error: "A" is not a subtype of "B" at "")
@@ -16,7 +16,7 @@ fun (main2): (Unit) =
 `).compile()
 }
 
-await tyckTest()
+tyckTest()
 
 let src = `
 # What follows is a GSLR(1) parser generation library for Meml
@@ -28,7 +28,7 @@ fun (main): (Unit) =
 `
 let c = new Compiler(src)
 //write([...new Syntax(c).syntax()])
-let obj = await c.compile()
+let obj = c.compile()
 document.getElementById("out").innerText = obj
 console.log(`Obj: ${obj}`)
 console.log(`Src: ${src}\n`)

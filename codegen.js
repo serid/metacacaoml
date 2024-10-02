@@ -27,8 +27,8 @@ export class Codegen {
     return ix
   }
   
-async expr() {
-  let ins = await this.ch.recv()
+*expr() {
+  let ins = yield*this.ch.recv()
   switch (ins.tag) {
   case Syntax.strlit:
     return `"${ins.data}"`
@@ -39,16 +39,16 @@ async expr() {
   case Syntax.app:
     let ixs = []
     while (true) {
-    let ins = await this.ch.recv()
+    let ins = yield*this.ch.recv()
     if (ins.tag === Syntax.endapp) break
     if (ins.tag !== Syntax.applam) {
-      this.ch.unshift(ins)
-      ixs.push(await this.expr())
+      this.ch.send(ins)
+      ixs.push(yield*this.expr())
       continue
     }
     // generate trailing lambda
     ixs.push(this.emitSsa(`(${join(it(ins.ps))}) => {`))
-    let retIx = await this.expr()
+    let retIx = yield*this.expr()
     this.code += `  return ${retIx}\n  }\n`
     }
     let fun = ixs.shift()
@@ -58,10 +58,10 @@ async expr() {
   }
 }
   
-async codegen() {
+*codegen() {
   this.code += `"use strict";\n`
   while (true) {
-  let ins = await this.ch.recv()
+  let ins = yield*this.ch.recv()
   //write("cg", ins)
   switch (ins.tag) {
   case Syntax.cls:
@@ -82,7 +82,7 @@ async codegen() {
     break
   case Syntax.let:
     this.code += `const ${mangle(ins.name)} = (()=>{\n`
-    let retIx = await this.expr()
+    let retIx = yield*this.expr()
     this.code += `  return ${retIx}\n})()\n`
     this.nextVar = 0
     break
@@ -90,8 +90,8 @@ async codegen() {
     const bs = map(ins.bs,x=>mangle(x.name))
     this.code += `function ${mangle(ins.name)}(${join(bs, ", ")}) {\n`
     
-    let retIx2 = await this.expr()
-    assertEq((await this.ch.recv()).tag, Syntax.endfun)
+    let retIx2 = yield*this.expr()
+    assertEq((yield*this.ch.recv()).tag, Syntax.endfun)
     
     this.code += `  return ${retIx2}\n}\n`
     this.nextVar = 0

@@ -60,6 +60,24 @@ export function mapInsert(o, key, value) {
   o[key] = value
 }
 
+
+// Synchronous queue that may request a new element through a generator
+export class Pakulikha {
+  constructor() {
+    this.q = null
+  }
+  send(x) {
+    assert(this.q === null)
+    this.q = x
+  }
+  *recv() {
+    if (this.q === null) yield
+    let ret = this.q
+    this.q = null
+    return ret
+  }
+}
+
 export function step(g, arg) {
   let val = g.next(arg).value
   assertL(val === undefined, () => "expected nothing, got " + toString(val))
@@ -69,29 +87,6 @@ export function nextLast(g, arg) {
   let { value, done } = g.next(arg)
   assert(done, "expected last")
   return value
-}
-
-export function* unshiftYield2(g, arg) {
-  let { value, done } = g.next(arg)
-  if (done) return value
-  return yield* g
-}
-
-export function* unshiftYield(g, arg) {
-  step(g)
-  let { value, done } = g.next(arg)
-  if (done) return value
-  
-  return yield* swallow(g)
-}
-
-// same as yield* minus the initial .next(undefined)
-export function* swallow(g) {
-  // todo: yield what
-  while (true) {
-    let { value, done } = g.next(yield)
-    if (done) return value
-  }
 }
 
 export function getOne(i) {

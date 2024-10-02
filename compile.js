@@ -1,6 +1,4 @@
-import { write } from './util.js';
-
-import { spawn, Spsc, Tunguska } from './chan.js';
+import { assert, write, step, Pakulikha } from './util.js';
 
 import { Syntax } from "./syntax.js"
 import { Huk } from "./huk.js"
@@ -13,17 +11,23 @@ class Analysis {
     this.compiler = compiler
   }
   
-  async analyze(ss) {
-    let a = new Spsc()
-    let b = new Spsc()
-    let tyck = new Huk(this.compiler, new Tunguska(a)).tyck()
-    let cg = new Codegen(this.compiler, new Tunguska(b)).codegen()
-    spawn(async () => { for (let i of ss) {
+  analyze(ss) {
+    let a = new Pakulikha()
+    let b = new Pakulikha()
+    let tyck = new Huk(this.compiler, a).tyck()
+    let cg = new Codegen(this.compiler, b).codegen()
+    step(tyck)
+    step(cg)
+    
+    let code
+    for (let i of ss) {
       write("analyze", i)
-      await a.send(i)
-      await b.send(i)
-    }})
-    let [_, code] = await Promise.all([tyck, cg])
+      a.send(i); b.send(i)
+      tyck.next()
+      code = cg.next().value
+    }
+    
+    assert(code !== undefined)
     return code
   }
 }
@@ -38,7 +42,7 @@ export class Compiler {
     return ` at "${this.src.substring(span, span + 7)}"`
   }
   
-  async compile() {
-    return await new Analysis(this).analyze(new Syntax(this).syntax())
+  compile() {
+    return new Analysis(this).analyze(new Syntax(this).syntax())
   }
 }
