@@ -8,22 +8,6 @@ fun (foo): String = ""
 @Fails(error: "A" is not a subtype of "B" at "")
 fun (f 'A 'B x:A): B = x
 
-fun (main): (Unit) =
-  # Lambdas are passed after function call
-  (let "10") λx.
-  (write x)
-  
-class Option 'A
-| (None)
-| (Some A)
-end
-
-# Adds constructors and a matching function to global scope
-# Matching function Option/elim analyses the object in first parameter and chooses one of lambdas passed to it, while giving it the object's fields
-
-let -check1: [(Option Int) []String [Int]String] String
-  = Option/elim
-
 fun (main2): (Unit) =
   # When function accepts multiple lambdas, they are written in brace notation
   (Option/elim (Option/Some "1"))
