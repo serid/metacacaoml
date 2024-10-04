@@ -157,7 +157,7 @@ export class Syntax {
     }
     if (this.tryWord("any"))
       return {tag: "any"}
-    return this.#type_(this.expr())
+    return this.#type_(it(this.expr()))
   }
   
   idents(end) {
@@ -192,46 +192,45 @@ export class Syntax {
     return bs
   }
   
-  *expr() {
+  // returns an array of instructions
+  expr() {
+    let span = this.i
+    let insQueue = []
     if (this.tryWord('"')) {
-      yield { tag: Syntax.strlit, span: this.i, data: this.stringLiteral('"')}
-      return
+      insQueue.push({tag: Syntax.strlit, span, data: this.stringLiteral('"')})
+    } else if (this.tryWord("native[|")) {
+      insQueue.push({tag: Syntax.native, span, code: this.stringLiteral("|]")})
+    } else {
+      let name = this.ident()
+      assertL(name !== null, ()=>"expected expression" + this.errorAt())
+      insQueue.push({tag: Syntax.use, span, name})
     }
-    if (this.tryWord("native[|")) {
-      yield {tag: Syntax.native, span: this.i, code: this.stringLiteral("|]")}
-      return
-    }
+    
+    span = this.i
     if (this.tryWord("(")) {
-      yield {tag: Syntax.app, span: this.i}
+      insQueue.unshift({tag: Syntax.app, span})
       while (!this.tryWord(")"))
-        yield* this.expr()
+        insQueue.push(...this.expr())
       while (true) {
+        span = this.i
         if (this.tryWord("λ")) {
           let ps = this.idents(".")
-          yield {tag: Syntax.applam, span: this.i, ps}
-          yield* this.expr()
+          insQueue.push({tag: Syntax.applam, span, ps})
+          insQueue.push(...this.expr())
           continue
         }
         if (this.tryWord("{")) {
           let ps = this.idents(".")
-          yield { tag: Syntax.applam, span: this.i, ps }
-          yield* this.expr()
+          insQueue.push({tag: Syntax.applam, span, ps})
+          insQueue.push(...this.expr())
           this.assertWord("}")
           continue
         }
         break
       }
-      yield {tag: Syntax.endapp, span: this.i}
-      return
+      insQueue.push({tag: Syntax.endapp, span: this.i})
     }
-    let span = this.i
-    let name = this.ident()
-    if (name !== null) {
-      yield {tag: Syntax.use, span, name}
-      return
-    }
-    
-    error("expected expression" + this.errorAt())
+    return insQueue
   }
   
   *toplevel() {
@@ -266,7 +265,7 @@ export class Syntax {
         cons.push({name, fields})
       }
       
-      yield {tag: Syntax.cls, name, gs, cons}
+      yield {tag: Syntax.cls, span, name, gs, cons}
     } else if (this.tryWord("let")) {
       let name = this.assertIdent()
       this.assertWord(":")
@@ -274,7 +273,7 @@ export class Syntax {
       this.assertWord("=")
     
       yield {tag: Syntax.let, span, name, retT}
-      yield* this.expr()
+      yield* it(this.expr())
     } else if (this.tryWord("fun")) {
       this.assertWord("(")
       let name = this.assertIdent()
@@ -285,7 +284,9 @@ export class Syntax {
       this.assertWord("=")
     
       yield {tag: Syntax.fun, span, name, gs, bs, retT, annots}
-      yield* this.expr()
+      let body = this.expr()
+      write("function body", body)
+      yield* it(body)
       yield {tag: Syntax.endfun, span: this.i}
     } else error("expected toplevel" + this.errorAt())
   }
