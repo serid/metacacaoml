@@ -250,8 +250,8 @@ export class Syntax {
       let cons = []
       while (!this.tryWord("end")) {
         this.assertWord("|")
-        this.assertWord("(")
         let name = this.assertIdent()
+        this.assertWord("(")
         
         let fields = []
         let c = 0
@@ -275,8 +275,8 @@ export class Syntax {
       yield {tag: Syntax.let, span, name, retT}
       yield* it(this.expr())
     } else if (this.tryWord("fun")) {
-      this.assertWord("(")
       let name = this.assertIdent()
+      this.assertWord("(")
       let gs = this.generics()
       let bs = this.bindings()
       this.assertWord(":")
