@@ -39,7 +39,7 @@ export class Compiler {
   }
   
   errorAt(span) {
-    return ` at "${this.src.substring(span, span + 7)}"`
+    return ` at "${this.src.substring(span, span + 20)}"`
   }
   
   compile() {

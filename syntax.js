@@ -200,6 +200,9 @@ export class Syntax {
       insQueue.push({tag: Syntax.strlit, span, data: this.stringLiteral('"')})
     } else if (this.tryWord("native[|")) {
       insQueue.push({tag: Syntax.native, span, code: this.stringLiteral("|]")})
+    } else if (this.tryWord("(")) {
+      insQueue = this.expr()
+      this.assertWord(")")
     } else {
       let name = this.ident()
       assertL(name !== null, ()=>"expected expression" + this.errorAt())

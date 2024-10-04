@@ -11,7 +11,7 @@ fun f('A 'B x:A): B = x
 fun main2(): Unit() =
   # When function accepts multiple lambdas, they are written in brace notation
   Option/elim(Option/Some("1"))
-  { . write("none") }
+  { . (write("none")) }
   { x. write(x) }
 `).compile()
 }
