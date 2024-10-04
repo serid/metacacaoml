@@ -79,8 +79,9 @@ static instantiate0(varMap, ty) {
       codomain: this.instantiate0(varMap, ty.codomain)
     }
   case "use":
-    if (varMap[ty.name] === undefined) return ty
-    return {...ty, tag: "euse"}
+    let name = varMap[ty.name]
+    if (name === undefined) return ty
+    return {tag: "euse", name}
   case "any":
   case "euse":
     return ty

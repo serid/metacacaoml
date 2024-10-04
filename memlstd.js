@@ -1,5 +1,7 @@
 // MetaCacaoML stdlib
 export default `
+fun id('A x:A): A = x
+
 class Unit
 | C()
 end
@@ -26,6 +28,12 @@ fun push(self:Array(A) x:A): Unit() = anyways(
 fun let('A 'B x:A f:[A]B): B = f(x)
 fun write('A x:A): Unit() = anyways(
   native[|console.log(x)|])
+  
+class Iter 'A
+| C([]A)
+end
+fun runIter('A i:Iter(A)): []A =
+  Iter/elim(i id)
   
 
 `
