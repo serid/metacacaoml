@@ -1,5 +1,4 @@
-// MetaCacaoML stdlib
-export default `
+# MetaCacaoML stdlib
 fun id('A x:A): A = x
 
 class Unit
@@ -82,4 +81,3 @@ fun iterMap('A 'B i:Iter(A) f:[A]B): Iter(B) =
   Option/elim(iterRun(i)())
   { . Option/None() }
   { x. Option/Some(f(x)) }
-`

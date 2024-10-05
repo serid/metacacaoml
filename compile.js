@@ -4,7 +4,7 @@ import { Syntax } from "./syntax.js"
 import { Huk } from "./huk.js"
 import { Codegen } from "./codegen.js"
 
-import std from "./memlstd.js"
+let std = await (await fetch("./memlstd.js")).text()
 
 class Analysis {
   constructor(compiler) {
