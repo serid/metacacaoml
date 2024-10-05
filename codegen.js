@@ -33,7 +33,7 @@ export class Codegen {
   case Syntax.strlit:
     return `"${ins.data}"`
   case Syntax.native:
-    return this.emitSsa(ins.code)
+    return ins.code
   case Syntax.use:
     return mangle(ins.name)
   case Syntax.app:
