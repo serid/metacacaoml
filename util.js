@@ -56,7 +56,8 @@ export function nonExhaustiveMatch(o, at) {
 
 
 export function mapInsert(o, key, value) {
-  assert(o[key] === undefined, "key already present")
+  assertEq(typeof key, "string")
+  assert(o[key] === undefined, "key already present: "+key)
   o[key] = value
 }
 

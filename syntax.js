@@ -19,6 +19,9 @@ export class Syntax {
   static eof = "eof"
   static applam = Symbol("applam")
   static let = Symbol("let")
+  static arrow = Symbol("arrow")
+  static any = Symbol("any")
+  static endarrow = Symbol("endarrow")
 
   constructor(compiler) {
     this.compiler = compiler
@@ -127,37 +130,43 @@ export class Syntax {
     return s
   }
   
-  #type_(es) {
+  #normalize(es) {
     let ins = getOne(es)
+    //write(ins)
     switch (ins.tag) {
+    case Syntax.any:
+      return {tag:"any", span:ins.span}
     case Syntax.use:
-      // drops the span
-      return {tag: ins.tag, name: ins.name}
+      return {tag:"use", span:ins.span, name:ins.name}
     case Syntax.app:
-      let cons = this.#type_(es)
+      let cons = this.#normalize(es)
       let args = []
       while (true) {
-        let arg = this.#type_(es)
+        let arg = this.#normalize(es)
         if (arg === null) break
         args.push(arg)
       }
-      return {tag: "app", cons, args}
-    default:
+      assertEq(cons.tag, "use")
+      return {tag:"cons", name:cons.name, args}
+    case Syntax.arrow:
+      let domain = []
+      while (true) {
+        let ty = this.#normalize(es)
+        if (ty === null) break
+        domain.push(ty)
+      }
+      let codomain = this.#normalize(es)
+      return {tag:"arrow", domain, codomain}
+    case Syntax.endapp:
+    case Syntax.endarrow:
       return null
+    default:
+      nonExhaustiveMatch(ins.tag)
     }
   }
   
   type() {
-    if (this.tryWord("[")) {
-      let domain = []
-      while (!this.tryWord("]"))
-        domain.push(this.type())
-      let codomain = this.type()
-      return {tag: "arrow", domain, codomain}
-    }
-    if (this.tryWord("any"))
-      return {tag: "any"}
-    return this.#type_(it(this.expr()))
+    return this.#normalize(it(this.expr()))
   }
   
   idents(end) {
@@ -203,6 +212,15 @@ export class Syntax {
     } else if (this.tryWord("(")) {
       insQueue = this.expr()
       this.assertWord(")")
+    } else if (this.tryWord("any()")) {
+      return [{tag:Syntax.any, span}]
+    } else if (this.tryWord("[")) {
+      insQueue.push({tag:Syntax.arrow, span:this.i})
+      while (!this.tryWord("]"))
+        insQueue.push(...this.expr())
+      insQueue.push({tag:Syntax.endarrow, span:this.i})
+      insQueue.push(...this.expr())
+      return insQueue
     } else {
       let name = this.ident()
       assertL(name !== null, ()=>"expected expression" + this.errorAt())

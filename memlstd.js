@@ -4,14 +4,14 @@ fun id('A x:A): A = x
 class Unit
 | C()
 end
-fun anyways(-:any): Unit() = Unit/C()
-fun and('A -:any other:A): A = other
+fun anyways(-:any()): Unit() = Unit/C()
+fun and('A -:any() other:A): A = other
 
 class Bool
 | False()
 | True()
 end
-fun boolFromNative(b:any): Bool() =
+fun boolFromNative(b:any()): Bool() =
   native[|b?Bool$True():Bool$False()|]
 
 class Int end
