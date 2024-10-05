@@ -121,7 +121,7 @@ substitute(ty) {
 }
 
 solveEvarTo(name, solution) {
-  write("solve evar", name, solution)
+  //write("solve evar", name, solution)
   assert(!this.ctx.some(
     x => x.tag === "esolve" && x.name === name),
     "evar already solved") // invariant
@@ -134,8 +134,8 @@ solveEvarTo(name, solution) {
 }
 
 unify(ty1, ty2) {
-  write("unify", typeToString(ty1),
-    typeToString(ty2), this.ctx)
+  /*write("unify", typeToString(ty1),
+    typeToString(ty2), this.ctx)*/
   if (ty1.tag === "euse" &&
     ty2.tag === "euse" &&
     ty1.name === ty2.name)
@@ -184,7 +184,7 @@ unify(ty1, ty2) {
   
 *infer() {
   let ins = yield*this.ch.recv()
-  write("infer", ins, this.ctx)
+  //write("infer", ins, this.ctx)
   switch (ins.tag) {
   case Syntax.strlit:
     return mkUse("String")
@@ -210,6 +210,7 @@ unify(ty1, ty2) {
     for (let i = 0; i < fty.domain.length; i++) {
       // mutate the type as we iterate through it, yuppie!!! 
       // this is necessary since context grows in information as we check arguments
+      // todo: performance: only substitute remaining arguments
       fty = this.substitute(fty)
       write("new fty", typeToString(fty), this.ctx)
       
@@ -302,6 +303,7 @@ unify(ty1, ty2) {
     {gs: [], ty: ins.retT})
     break
   case Syntax.fun:
+    let beforeFun = performance.now()
     assert(ins.annots.length <= 1)
     mapInsert(this.globals, ins.name,
     {gs: ins.gs, ty: {tag: "arrow", domain: ins.bs.map(x => x.type), codomain: ins.retT}})
@@ -325,6 +327,7 @@ unify(ty1, ty2) {
     // check if all evars are solved? no
     //assert(this.ctx.)
     this.ctx = []
+    write(`fun ${ins.name} analysis time`, performance.now()-beforeFun)
     break
   case Syntax.eof:
     return

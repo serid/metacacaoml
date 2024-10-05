@@ -21,7 +21,7 @@ class Analysis {
     
     let code
     for (let i of ss) {
-      write("analyze", i)
+      //write("analyze", i)
       a.send(i); b.send(i)
       tyck.next()
       code = cg.next().value

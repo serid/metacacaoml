@@ -47,7 +47,7 @@ export class Codegen {
       continue
     }
     // generate trailing lambda
-    ixs.push(this.emitSsa(`(${join(it(ins.ps))}) => {`))
+    ixs.push(this.emitSsa(`(${join(map(ins.ps,mangle))}) => {`))
     let retIx = yield*this.expr()
     this.code += `  return ${retIx}\n  }\n`
     }

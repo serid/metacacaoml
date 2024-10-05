@@ -209,6 +209,7 @@ export class Syntax {
       insQueue.push({tag: Syntax.use, span, name})
     }
     
+    while (true) {
     span = this.i
     if (this.tryWord("(")) {
       insQueue.unshift({tag: Syntax.app, span})
@@ -232,7 +233,10 @@ export class Syntax {
         break
       }
       insQueue.push({tag: Syntax.endapp, span: this.i})
+      continue
     }
+    break
+    } // end postfix loop
     return insQueue
   }
   
@@ -288,7 +292,7 @@ export class Syntax {
     
       yield {tag: Syntax.fun, span, name, gs, bs, retT, annots}
       let body = this.expr()
-      write("function body", body)
+      //write("function body", body)
       yield* it(body)
       yield {tag: Syntax.endfun, span: this.i}
     } else error("expected toplevel" + this.errorAt())
