@@ -36,10 +36,22 @@ function mkType(o) {
 export class Huk {
   constructor(c, ch) {
     this.c = c // compiler
-    this.ch = ch
     this.globals = Object.create(null)
-    this.ctx = []
+    
+    this.item = null
+    this.k = -13
+    this.ctx = null
   }
+
+setItem(item) {
+  this.item = item
+  this.k = 0
+  this.ctx = []
+}
+
+nextIns() {
+  return this.item.arena[this.k++]
+}
 
 // invent a name like hint but not present in "taken"
 static invent(hint, taken) {
@@ -182,8 +194,8 @@ unify(ty1, ty2) {
   }
 }
   
-*infer() {
-  let ins = yield*this.ch.recv()
+infer() {
+  let ins = this.nextIns()
   //write("infer", ins, this.ctx)
   switch (ins.tag) {
   case Syntax.strlit:
@@ -203,7 +215,7 @@ unify(ty1, ty2) {
     return this.instantiate(gb.gs, gb.ty)
   case Syntax.app:
     write("infer app")
-    let fty = yield*this.infer()
+    let fty = this.infer()
     write("fty", typeToString(fty))
     assertEq(fty.tag, "arrow") //todo evar
     
@@ -215,15 +227,15 @@ unify(ty1, ty2) {
       write("new fty", typeToString(fty), this.ctx)
       
       let par = fty.domain[i]
-      let ins2 = yield*this.ch.recv()
+      let ins2 = this.nextIns()
       if (ins2.tag === Syntax.endapp)
         error("expected argument of type " +
         typeToString(par) +
         this.c.errorAt(ins2.span))
       // simple application
       if (ins2.tag !== Syntax.applam) {
-        this.ch.send(ins2)
-        yield*this.check(par)
+        this.k--
+        this.check(par)
         continue
       }
       // application of trailing lambda
@@ -237,7 +249,7 @@ unify(ty1, ty2) {
           type: par.domain[j]
         })
       }
-      yield*this.check(par.codomain)
+      this.check(par.codomain)
       for (let name of ps) {
         let ix = this.ctx.findLastIndex(x =>
           x.tag === "var" &&
@@ -247,15 +259,15 @@ unify(ty1, ty2) {
       }
     }
 
-    assertEq((yield*this.ch.recv()).tag, Syntax.endapp) // invariant
+    assertEq((this.nextIns()).tag, Syntax.endapp) // invariant
     return this.substitute(fty.codomain)
   default:
     nonExhaustiveMatch(ins.tag)
   }
 }
   
-*check(ty) {
-  let ins = yield*this.ch.recv()
+check(ty) {
+  let ins = this.nextIns()
   write("check", ins, ty)
   switch (ins.tag) {
   case Syntax.native:
@@ -263,8 +275,8 @@ unify(ty1, ty2) {
   case Syntax.strlit:
   case Syntax.use:
   case Syntax.app:
-    this.ch.send(ins)
-    let ty2 = yield*this.infer()
+    this.k--
+    let ty2 = this.infer()
     write("inferred for check", ty2)
     this.unify(this.substitute(ty2),
       this.substitute(ty))
@@ -274,74 +286,70 @@ unify(ty1, ty2) {
   }
 }
   
-*tyck() {
+tyck() {
   // A container for functions and constants to be used during compile-time evaluation
-  // It's an extension of global object so generated code can refer to normal globals too
+  // It's an extension of global object so generated code can refer to js builtins too
   globalThis.fixtures = Object.create(globalThis)
   
-  while (true) {
-  let ins = yield*this.ch.recv()
-  //write("tyck", ins)
-  switch (ins.tag) {
+  let item = this.item
+  switch (item.tag) {
   case Syntax.cls:
-    write(fixtures, ins.name,fixtures[ins.name])
-    fixtures[ins.name] = (...xs)=>({
-      tag:"cons", name:ins.name, args:xs})
+    write(fixtures,item.name,fixtures[item.name])
+    fixtures[item.name] = (...xs)=>({
+      tag:"cons", name:item.name, args:xs})
     
     let self = {tag: "cons", 
-          name:ins.name,
-          args:ins.gs.map(mkUse)
+          name:item.name,
+          args:item.gs.map(mkUse)
         }
-    for (let c of ins.cons) {
-      mapInsert(this.globals, ins.name+"/"+c.name, {gs: ins.gs, ty: {tag: "arrow", domain: c.fields.map(x=>x.type), codomain: self
+    for (let c of item.cons) {
+      mapInsert(this.globals, item.name+"/"+c.name, {gs: item.gs, ty: {tag: "arrow", domain: c.fields.map(x=>x.type), codomain: self
       }})
     }
-    let ret = Huk.invent("R", ins.gs)
-    let domain = [self].concat(ins.cons.map(c=>({tag: "arrow",
+    let ret = Huk.invent("R", item.gs)
+    let domain = [self].concat(item.cons.map(c=>({tag: "arrow",
       domain: c.fields.map(f=>f.type),
       codomain: mkUse(ret)
     })
     ))
-    mapInsert(this.globals, ins.name+"/elim", {gs: ins.gs.concat([ret]), ty: {tag: "arrow", domain, codomain: mkUse(ret)}})
+    mapInsert(this.globals, item.name+"/elim", {gs: item.gs.concat([ret]), ty: {tag: "arrow", domain, codomain: mkUse(ret)}})
     break
   case Syntax.let:
-    yield*this.check(ins.retT)
+    this.check(item.retT)
     this.ctx = []
-    mapInsert(this.globals, ins.name,
-    {gs: [], ty: ins.retT})
+    mapInsert(this.globals, item.name,
+    {gs: [], ty: item.retT})
     break
   case Syntax.fun:
     let beforeFun = performance.now()
-    assert(ins.annots.length <= 1)
-    mapInsert(this.globals, ins.name,
-    {gs: ins.gs, ty: {tag: "arrow", domain: ins.bs.map(x => x.type), codomain: ins.retT}})
-    for (let name of ins.gs)
+    assert(item.annots.length <= 1)
+    mapInsert(this.globals, item.name,
+    {gs: item.gs, ty: {tag: "arrow", domain: item.bs.map(x => x.type), codomain: item.retT}})
+    for (let name of item.gs)
       this.ctx.push({tag: "uni", name})
-    for (let {name, type} of ins.bs)
+    for (let {name, type} of item.bs)
       this.ctx.push({tag: "var", name, type})
 
-    if (ins.annots.length === 0)
-      yield*this.check(ins.retT)
+    if (item.annots.length === 0)
+      this.check(item.retT)
     else {
       try {
-        yield*this.check(ins.retT)
+        this.check(item.retT)
         error("[no error]")
       } catch (e) {
-        assertEq(e.message, ins.annots[0].text)
+        assertEq(e.message, item.annots[0].text)
       }
     }
-    assertEq((yield*this.ch.recv()).tag, Syntax.endfun) // invariant
     
     // check if all evars are solved? no
     //assert(this.ctx.)
     this.ctx = []
-    write(`fun ${ins.name} analysis time`, performance.now()-beforeFun)
+    write(`fun ${item.name} analysis time`, performance.now()-beforeFun)
     break
   case Syntax.eof:
     return
   default:
-    nonExhaustiveMatch(ins.tag)
-  }
+    nonExhaustiveMatch(item.tag)
   }
 }
 }

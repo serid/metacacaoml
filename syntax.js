@@ -258,7 +258,7 @@ export class Syntax {
     return insQueue
   }
   
-  *toplevel() {
+  toplevel() {
     let annots = []
     if (this.tryWord("@")) {
       let name = this.assertIdent()
@@ -290,15 +290,14 @@ export class Syntax {
         cons.push({name, fields})
       }
       
-      yield {tag: Syntax.cls, span, name, gs, cons}
+      return {tag: Syntax.cls, span, name, gs, cons}
     } else if (this.tryWord("let")) {
       let name = this.assertIdent()
       this.assertWord(":")
       let retT = this.type()
       this.assertWord("=")
     
-      yield {tag: Syntax.let, span, name, retT}
-      yield* it(this.expr())
+      return {tag: Syntax.let, span, name, retT, arena: this.expr()}
     } else if (this.tryWord("fun")) {
       let name = this.assertIdent()
       this.assertWord("(")
@@ -308,11 +307,9 @@ export class Syntax {
       let retT = this.type()
       this.assertWord("=")
     
-      yield {tag: Syntax.fun, span, name, gs, bs, retT, annots}
-      let body = this.expr()
-      //write("function body", body)
-      yield* it(body)
-      yield {tag: Syntax.endfun, span: this.i}
+      let arena = this.expr()
+      write("function body", arena)
+      return {tag: Syntax.fun, span, name, gs, bs, retT, annots, arena}
     } else error("expected toplevel" + this.errorAt())
   }
   
@@ -320,8 +317,8 @@ export class Syntax {
     this.tryWhitespace()
     while (this.notPastEof()) {
       fuel.step()
-      yield* this.toplevel()
+      yield this.toplevel()
     }
-    yield {tag: Syntax.eof, span: this.i}
+    yield {tag:Syntax.eof, span: this.i}
   }
 }

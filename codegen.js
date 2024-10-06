@@ -12,9 +12,21 @@ function mangle(path) {
 export class Codegen {
   constructor(c, ch) {
     this.c = c // compiler
-    this.ch = ch
-    this.code = ""
+    this.code = `"use strict";\n`
+    
+    this.item = null
+    this.k = -13
+    this.nextVar = -13
+  }
+
+  setItem(item) {
+    this.item = item
+    this.k = 0
     this.nextVar = 0
+  }
+
+  nextIns() {
+    return this.item.arena[this.k++]
   }
   
   alloc() {
@@ -27,8 +39,8 @@ export class Codegen {
     return ix
   }
   
-*expr() {
-  let ins = yield*this.ch.recv()
+expr() {
+  let ins = this.nextIns()
   switch (ins.tag) {
   case Syntax.strlit:
     return `"${ins.data}"`
@@ -39,16 +51,16 @@ export class Codegen {
   case Syntax.app:
     let ixs = []
     while (true) {
-    let ins = yield*this.ch.recv()
+    let ins = this.nextIns()
     if (ins.tag === Syntax.endapp) break
     if (ins.tag !== Syntax.applam) {
-      this.ch.send(ins)
-      ixs.push(yield*this.expr())
+      this.k--
+      ixs.push(this.expr())
       continue
     }
     // generate trailing lambda
     ixs.push(this.emitSsa(`(${join(map(ins.ps,mangle))}) => {`))
-    let retIx = yield*this.expr()
+    let retIx = this.expr()
     this.code += `  return ${retIx}\n  }\n`
     }
     let fun = ixs.shift()
@@ -58,19 +70,18 @@ export class Codegen {
   }
 }
   
-*codegen() {
-  this.code += `"use strict";\n`
-  while (true) {
-  let ins = yield*this.ch.recv()
+codegen() {
+  let item = this.item
+
   //write("cg", ins)
-  switch (ins.tag) {
+  switch (item.tag) {
   case Syntax.cls:
     let elimCode = ""
-    elimCode += `function ${ins.name}$elim(self, ${join(map(ins.cons, x=>x.name), ", ")}) {\n  switch (self.tag) {\n`
-    for (let c of ins.cons) {
+    elimCode += `function ${item.name}$elim(self, ${join(map(item.cons, x=>x.name), ", ")}) {\n  switch (self.tag) {\n`
+    for (let c of item.cons) {
       const ps = c.fields.map(x=>x.name)
       const bs = join(it(ps), ", ")
-      let fullname = ins.name +"$"+ c.name
+      let fullname = item.name +"$"+ c.name
       this.code += `function ${fullname}(${bs}) {\n`
       this.code += `  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`
       let as = join(map(ps, x=>"self."+x), ", ")
@@ -81,17 +92,16 @@ export class Codegen {
     this.code += elimCode
     break
   case Syntax.let:
-    this.code += `const ${mangle(ins.name)} = (()=>{\n`
-    let retIx = yield*this.expr()
+    this.code += `const ${mangle(item.name)} = (()=>{\n`
+    let retIx = this.expr()
     this.code += `  return ${retIx}\n})()\n`
     this.nextVar = 0
     break
   case Syntax.fun:
-    const bs = map(ins.bs,x=>mangle(x.name))
-    this.code += `function ${mangle(ins.name)}(${join(bs, ", ")}) {\n`
+    const bs = map(item.bs,x=>mangle(x.name))
+    this.code += `function ${mangle(item.name)}(${join(bs, ", ")}) {\n`
     
-    let retIx2 = yield*this.expr()
-    assertEq((yield*this.ch.recv()).tag, Syntax.endfun)
+    let retIx2 = this.expr()
     
     this.code += `  return ${retIx2}\n}\n`
     this.nextVar = 0
@@ -100,8 +110,7 @@ export class Codegen {
     this.code += `main()`
     return this.code
   default:
-    nonExhaustiveMatch(ins.tag)
-  }
+    nonExhaustiveMatch(item.tag)
   }
 }
 }

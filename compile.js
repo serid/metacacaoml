@@ -11,24 +11,19 @@ class Analysis {
     this.compiler = compiler
   }
   
-  analyze(ss) {
-    let a = new Pakulikha()
-    let b = new Pakulikha()
-    let tyck = new Huk(this.compiler, a).tyck()
-    let cg = new Codegen(this.compiler, b).codegen()
-    step(tyck)
-    step(cg)
+  analyze(items) {
+    let tyck = new Huk(this.compiler)
+    let cg = new Codegen(this.compiler)
     
-    let code
-    for (let i of ss) {
-      //write("analyze", i)
-      a.send(i); b.send(i)
-      tyck.next()
-      code = cg.next().value
+    for (let item of items) {
+      write("analyze", item)
+      tyck.setItem(item)
+      tyck.tyck()
+      cg.setItem(item)
+      cg.codegen()
     }
     
-    assert(code !== undefined)
-    return code
+    return cg.code
   }
 }
 
