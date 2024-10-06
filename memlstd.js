@@ -11,21 +11,21 @@ class Bool
 | False()
 | True()
 end
-fun boolFromNative(b:any()): Bool() =
+fun bool-from-native(b:any()): Bool() =
   native[|b?Bool$True():Bool$False()|]
 
 class Int end
-let zero: Int = native[|0|]
-fun intIncr(x:Int): Int = native[|x+1|]
-fun intLt(x:Int y:Int): Bool() =
-  boolFromNative(native[|x<y|])
+let zero: Int() = native[|0|]
+fun .increment(x:Int()): Int() = native[|x+1|]
+fun .lt(x:Int() y:Int()): Bool() =
+  bool-from-native(native[|x<y|])
 
 class Box 'A
 | New(A)
 end
-fun boxGet('A self:Box(A)): A =
+fun .get('A self:Box(A)): A =
   native[|self._0|]
-fun boxSet('A self:Box(A) x:A): Unit() =
+fun .set('A self:Box(A) x:A): Unit() =
   anyways(native[|self._0 = x|])
 
 class Option 'A
@@ -40,12 +40,12 @@ let -check1: [Option(Int) []String [Int]String] String
   = Option/elim
 
 class Array 'A end
-fun newArray(): Array(A) = native[|[]|]
-fun arrayLength('A self:Array(A)): Int =
+fun new-array(): Array(A) = native[|[]|]
+fun .length('A self:Array(A)): Int() =
   native[|self.length|]
-fun arrayGet('A self:Array(A) i:Int): A =
+fun .get('A self:Array(A) i:Int()): A =
   native[|self[i]|]
-fun arrayPush(self:Array(A) x:A): Unit() =
+fun .push(self:Array(A) x:A): Unit() =
   anyways(native[|self.push(x)|])
 
 # [A]B is a type of functions from A to B.
@@ -57,27 +57,27 @@ fun write('A x:A): Unit() = anyways(
 class Iter 'A
 | New([]Option(A))
 end
-fun iterRun('A i:Iter(A)): []Option(A) =
+fun .unpack('A i:Iter(A)): []Option(A) =
   Iter/elim(i id)
-fun iterForEach('A i:Iter(A) f:[A]Unit()): Unit() = Option/elim(iterRun(i)())
+fun .for-each('A i:Iter(A) f:[A]Unit()): Unit() = Option/elim(i.unpack()())
   { . Unit/C() }
-  { x. and(f(x) iterForEach(i f)) }
-fun iterToArray('A i:Iter(A)): Array(A) =
-  let(newArray()) λ xs.
-  let(iterForEach(i) λ x.
-    arrayPush(xs x)
+  { x. and(f(x) i.for-each(f)) }
+fun .to-array('A i:Iter(A)): Array(A) =
+  let(new-array()) λ xs.
+  let(i.for-each() λ x.
+    xs.push(x)
   ) λ -.
   xs
-fun arrayToIter('A xs:Array(A)): Iter(A) =
+fun .to-iter('A xs:Array(A)): Iter(A) =
   let(Box/New(zero)) λ i.
   Iter/New() λ .
-  let(boxGet(i)) λ iv.
-  Bool/elim(intLt(iv arrayLength(xs)))
+  let(i.get()) λ iv.
+  Bool/elim(iv.lt(xs.length()))
   { . Option/None() }
-  { . let(arrayGet(xs iv)) λ elem.
-    and(boxSet(i intIncr(iv)) Option/Some(elem)) }
-fun iterMap('A 'B i:Iter(A) f:[A]B): Iter(B) =
+  { . let(xs.get(iv)) λ elem.
+    and(i.set(iv.increment()) Option/Some(elem)) }
+fun .map('A 'B i:Iter(A) f:[A]B): Iter(B) =
   Iter/New() λ .
-  Option/elim(iterRun(i)())
+  Option/elim(i.unpack()())
   { . Option/None() }
   { x. Option/Some(f(x)) }

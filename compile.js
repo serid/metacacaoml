@@ -6,31 +6,12 @@ import { Codegen } from "./codegen.js"
 
 let std = await (await fetch("./memlstd.js")).text()
 
-class Analysis {
-  constructor(compiler) {
-    this.compiler = compiler
-  }
-  
-  analyze(items) {
-    let tyck = new Huk(this.compiler)
-    let cg = new Codegen(this.compiler)
-    
-    for (let item of items) {
-      write("analyze", item)
-      tyck.setItem(item)
-      tyck.tyck()
-      cg.setItem(item)
-      cg.codegen()
-    }
-    
-    return cg.code
-  }
-}
-
 export class Compiler {
   constructor(src) {
     src = std + src
     this.src = src
+    this.tyck = new Huk(this)
+    this.cg = new Codegen(this)
   }
   
   errorAt(span) {
@@ -38,6 +19,18 @@ export class Compiler {
   }
   
   compile() {
-    return new Analysis(this).analyze(new Syntax(this).syntax())
+    return this.analyze(new Syntax(this).syntax())
+  }
+  
+  analyze(items) {
+    for (let item of items) {
+      write("analyze", item)
+      this.tyck.setItem(item)
+      this.tyck.tyck()
+      this.cg.setItem(item)
+      this.cg.codegen()
+    }
+  
+    return this.cg.code
   }
 }

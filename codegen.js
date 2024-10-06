@@ -1,6 +1,7 @@
-import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, it, findUniqueIndex, map, join } from './util.js';
+import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, mapGet, step, nextLast, it, findUniqueIndex, map, join } from './util.js';
 
 import { Syntax } from "./syntax.js"
+import { getFunName } from "./huk.js"
 
 function mangle(path) {
   path = path.replaceAll("/", "$")
@@ -40,6 +41,7 @@ export class Codegen {
   }
   
 expr() {
+  let insLocation = this.k
   let ins = this.nextIns()
   switch (ins.tag) {
   case Syntax.strlit:
@@ -51,19 +53,23 @@ expr() {
   case Syntax.app:
     let ixs = []
     while (true) {
-    let ins = this.nextIns()
-    if (ins.tag === Syntax.endapp) break
-    if (ins.tag !== Syntax.applam) {
+    let ins2 = this.nextIns()
+    if (ins2.tag === Syntax.endapp) break
+    if (ins2.tag !== Syntax.applam) {
       this.k--
       ixs.push(this.expr())
       continue
     }
     // generate trailing lambda
-    ixs.push(this.emitSsa(`(${join(map(ins.ps,mangle))}) => {`))
+    ixs.push(this.emitSsa(`(${join(map(ins2.ps,mangle))}) => {`))
     let retIx = this.expr()
     this.code += `  return ${retIx}\n  }\n`
     }
-    let fun = ixs.shift()
+    // For methods, fetch full name produced by tyck, otherwise the fun is first expression
+    write(ins)
+    let fun = ins.metName!==null?
+      mangle(mapGet(this.c.tyck.methodNameAt, insLocation))
+      : ixs.shift()
     return this.emitSsa(`${fun}(${join(it(ixs))})`) 
   default:
     nonExhaustiveMatch(ins.tag)
@@ -99,7 +105,7 @@ codegen() {
     break
   case Syntax.fun:
     const bs = map(item.bs,x=>mangle(x.name))
-    this.code += `function ${mangle(item.name)}(${join(bs, ", ")}) {\n`
+    this.code += `function ${mangle(getFunName(item))}(${join(bs, ", ")}) {\n`
     
     let retIx2 = this.expr()
     

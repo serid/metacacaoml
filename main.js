@@ -19,9 +19,9 @@ let src = `
 fun main(): Unit() =
   let(native[|[1, 2, 3]|]) λarray.
   let(write(array)) λ-.
-  let(arrayToIter(array)) λiterator.
-  let(iterMap(iterator intIncr)) λincremented.
-  write(iterToArray(incremented))
+  let(Array/to-iter(array)) λiterator.
+  let(iterator.map(Int/increment)) λincremented.
+  write(incremented.to-array())
 `
 let c = new Compiler(src)
 //write([...new Syntax(c).syntax()])

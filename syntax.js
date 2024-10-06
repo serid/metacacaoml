@@ -229,8 +229,14 @@ export class Syntax {
     
     while (true) {
     span = this.i
+    
+    let metName = null
+    if (this.tryWord(".")) {
+      metName = this.assertIdent()
+    }
+      
     if (this.tryWord("(")) {
-      insQueue.unshift({tag: Syntax.app, span})
+      insQueue.unshift({tag: Syntax.app, span, metName})
       while (!this.tryWord(")"))
         insQueue.push(...this.expr())
       while (true) {
@@ -299,6 +305,7 @@ export class Syntax {
     
       return {tag: Syntax.let, span, name, retT, arena: this.expr()}
     } else if (this.tryWord("fun")) {
+      let isMethod = this.tryWord(".")
       let name = this.assertIdent()
       this.assertWord("(")
       let gs = this.generics()
@@ -309,7 +316,7 @@ export class Syntax {
     
       let arena = this.expr()
       write("function body", arena)
-      return {tag: Syntax.fun, span, name, gs, bs, retT, annots, arena}
+      return {tag: Syntax.fun, span, isMethod,name, gs, bs, retT, annots, arena}
     } else error("expected toplevel" + this.errorAt())
   }
   

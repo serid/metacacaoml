@@ -36,17 +36,24 @@ function mkType(o) {
 export class Huk {
   constructor(c, ch) {
     this.c = c // compiler
+    // Map<string, type>
     this.globals = Object.create(null)
     
     this.item = null
     this.k = -13
     this.ctx = null
+
+    // Codegen will be querying the methodname
+    // Map<int, string>
+    this.methodNameAt = null
   }
 
 setItem(item) {
   this.item = item
   this.k = 0
   this.ctx = []
+  
+  this.methodNameAt = Object.create(null)
 }
 
 nextIns() {
@@ -195,6 +202,7 @@ unify(ty1, ty2) {
 }
   
 infer() {
+  let insLocation = this.k
   let ins = this.nextIns()
   //write("infer", ins, this.ctx)
   switch (ins.tag) {
@@ -210,16 +218,32 @@ infer() {
     
     // try finding a global
     let gb = this.globals[ins.name]
-    if (gb === undefined)
-      error("var not found" + this.c.errorAt(ins.span))
+    assert(gb !== undefined, "var not found" + this.c.errorAt(ins.span))
     return this.instantiate(gb.gs, gb.ty)
   case Syntax.app:
-    write("infer app")
-    let fty = this.infer()
+    let isMethod = ins.metName !== null
+    //write("infer app")
+    let fty
+    if (!isMethod)
+      fty = this.infer()
+    else {
+      let receiver = this.infer()
+      assertEq(receiver.tag, "cons")
+      
+      let methodName = receiver.name+"/"+ins.metName
+      mapInsert(this.methodNameAt, insLocation, methodName)
+      let gb = this.globals[methodName]
+      
+      assert(gb !== undefined,
+        "method not found" + this.c.errorAt(ins.span))
+      fty = this.instantiate(gb.gs, gb.ty)
+      assert(fty.domain.length > 0)
+      this.unify(receiver, fty.domain[0])
+    }
     write("fty", typeToString(fty))
     assertEq(fty.tag, "arrow") //todo evar
     
-    for (let i = 0; i < fty.domain.length; i++) {
+    for (let i = isMethod?1:0; i < fty.domain.length; i++) {
       // mutate the type as we iterate through it, yuppie!!! 
       // this is necessary since context grows in information as we check arguments
       // todo: performance: only substitute remaining arguments
@@ -323,7 +347,9 @@ tyck() {
   case Syntax.fun:
     let beforeFun = performance.now()
     assert(item.annots.length <= 1)
-    mapInsert(this.globals, item.name,
+    let name = getFunName(item)
+    write(name)
+    mapInsert(this.globals, name,
     {gs: item.gs, ty: {tag: "arrow", domain: item.bs.map(x => x.type), codomain: item.retT}})
     for (let name of item.gs)
       this.ctx.push({tag: "uni", name})
@@ -343,15 +369,22 @@ tyck() {
     
     // check if all evars are solved? no
     //assert(this.ctx.)
-    this.ctx = []
-    write(`fun ${item.name} analysis time`, performance.now()-beforeFun)
+    write(`fun ${name} analysis time`, performance.now()-beforeFun)
     break
   case Syntax.eof:
-    return
+    break
   default:
     nonExhaustiveMatch(item.tag)
   }
 }
+}
+
+export function getFunName(item) {
+  if (item.isMethod) {
+    assert(item.bs.length >= 1)
+    assertEq(item.bs[0].type.tag, "cons")
+    return item.bs[0].type.name + "/" + item.name
+  } else return item.name
 }
 
 function normalize(inss) {
