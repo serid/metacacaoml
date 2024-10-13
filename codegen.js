@@ -4,9 +4,11 @@ import { Syntax } from "./syntax.js"
 import { getFunName } from "./huk.js"
 
 function mangle(path) {
-  path = path.replaceAll("/", "$")
-  path = path.replaceAll("-", "_")
-  path = path === "let" ? "hlet" : path
+  // hazard: unicode!!
+  // characters found using shapecatcher.com
+  path = path.replaceAll("/", "ᐅ")
+  path = path.replaceAll("-", "ᜭ")
+  path = path === "let" ? "Ξlet" : path
   return path
 }
 
@@ -52,25 +54,35 @@ expr() {
     return mangle(ins.name)
   case Syntax.app:
     let ixs = []
+    // generate strict arguments
+    while (true) {
+    let ins2 = this.nextIns()
+    this.k--
+    if (ins2.tag === Syntax.endapp) break
+    if (ins2.tag === Syntax.applam) break
+    ixs.push(this.expr())
+    }
+    
+    // For methods, fetch full name produced by tyck, otherwise the fun is first expression
+    //write(ins)
+    let fun = ins.metName !== null ?
+      mangle(mapGet(this.c.tyck.methodNameAt, insLocation)) :
+      ixs.shift()
+    let retIx = this.emitSsa(`${fun}(${join(map(ixs,x=>x+","), " ")}`)
+    
+    // generate trailing lambdas
     while (true) {
     let ins2 = this.nextIns()
     if (ins2.tag === Syntax.endapp) break
-    if (ins2.tag !== Syntax.applam) {
-      this.k--
-      ixs.push(this.expr())
-      continue
-    }
-    // generate trailing lambda
-    ixs.push(this.emitSsa(`(${join(map(ins2.ps,mangle))}) => {`))
+    assertEq(ins2.tag, Syntax.applam)
+    
+    this.code += `  (${join(map(ins2.ps,mangle))}) => {\n`
     let retIx = this.expr()
-    this.code += `  return ${retIx}\n  }\n`
+    this.code += `  return ${retIx}\n  },\n`
     }
-    // For methods, fetch full name produced by tyck, otherwise the fun is first expression
-    write(ins)
-    let fun = ins.metName!==null?
-      mangle(mapGet(this.c.tyck.methodNameAt, insLocation))
-      : ixs.shift()
-    return this.emitSsa(`${fun}(${join(it(ixs))})`) 
+    
+    this.code += "  );\n"
+    return retIx
   default:
     nonExhaustiveMatch(ins.tag)
   }
@@ -83,11 +95,12 @@ codegen() {
   switch (item.tag) {
   case Syntax.cls:
     let elimCode = ""
-    elimCode += `function ${item.name}$elim(self, ${join(map(item.cons, x=>x.name), ", ")}) {\n  switch (self.tag) {\n`
+    let fullname = mangle(item.name+"/elim")
+    elimCode += `function ${fullname}(self, ${join(map(item.cons, x=>x.name), ", ")}) {\n  switch (self.tag) {\n`
     for (let c of item.cons) {
       const ps = c.fields.map(x=>x.name)
       const bs = join(it(ps), ", ")
-      let fullname = item.name +"$"+ c.name
+      let fullname = mangle(item.name+"/"+c.name)
       this.code += `function ${fullname}(${bs}) {\n`
       this.code += `  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`
       let as = join(map(ps, x=>"self."+x), ", ")
@@ -100,7 +113,7 @@ codegen() {
   case Syntax.let:
     this.code += `const ${mangle(item.name)} = (()=>{\n`
     let retIx = this.expr()
-    this.code += `  return ${retIx}\n})()\n`
+    this.code += `  return ${retIx}\n})();\n`
     this.nextVar = 0
     break
   case Syntax.fun:
