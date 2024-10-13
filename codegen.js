@@ -68,7 +68,7 @@ expr() {
     let fun = ins.metName !== null ?
       mangle(mapGet(this.c.tyck.methodNameAt, insLocation)) :
       ixs.shift()
-    let retIx = this.emitSsa(`${fun}(${join(map(ixs,x=>x+","), " ")}`)
+    let retIx = this.emitSsa(`yield* ${fun}(${join(map(ixs,x=>x+","), " ")}`)
     
     // generate trailing lambdas
     while (true) {
@@ -76,7 +76,7 @@ expr() {
     if (ins2.tag === Syntax.endapp) break
     assertEq(ins2.tag, Syntax.applam)
     
-    this.code += `  (${join(map(ins2.ps,mangle))}) => {\n`
+    this.code += `  function*(${join(map(ins2.ps,mangle))}) {\n`
     let retIx = this.expr()
     this.code += `  return ${retIx}\n  },\n`
     }
@@ -96,29 +96,29 @@ codegen() {
   case Syntax.cls:
     let elimCode = ""
     let fullname = mangle(item.name+"/elim")
-    elimCode += `function ${fullname}(self, ${join(map(item.cons, x=>x.name), ", ")}) {\n  switch (self.tag) {\n`
+    elimCode += `function* ${fullname}(self, ${join(map(item.cons, x=>x.name))}) {\n  switch (self.tag) {\n`
     for (let c of item.cons) {
-      const ps = c.fields.map(x=>x.name)
-      const bs = join(it(ps), ", ")
+      let ps = c.fields.map(x=>x.name)
+      let bs = join(it(ps))
       let fullname = mangle(item.name+"/"+c.name)
-      this.code += `function ${fullname}(${bs}) {\n`
+      this.code += `function* ${fullname}(${bs}) {\n`
       this.code += `  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`
-      let as = join(map(ps, x=>"self."+x), ", ")
-      elimCode += `  case Symbol.for("${c.name}"): return ${c.name}(${as});\n`
+      let as = join(map(ps, x=>"self."+x))
+      elimCode += `  case Symbol.for("${c.name}"): return yield* ${c.name}(${as});\n`
     }
     elimCode += `  default: throw new Error("nonexhaustive: " + self.tag.description)\n`
     elimCode += "  }\n}\n"
     this.code += elimCode
     break
   case Syntax.let:
-    this.code += `const ${mangle(item.name)} = (()=>{\n`
+    this.code += `const ${mangle(item.name)} = (function*() {\n`
     let retIx = this.expr()
-    this.code += `  return ${retIx}\n})();\n`
+    this.code += `  return ${retIx}\n})().next().value;\n`
     this.nextVar = 0
     break
   case Syntax.fun:
-    const bs = map(item.bs,x=>mangle(x.name))
-    this.code += `function ${mangle(getFunName(item))}(${join(bs, ", ")}) {\n`
+    let bs = map(item.bs,x=>mangle(x.name))
+    this.code += `function* ${mangle(getFunName(item))}(${join(bs)}) {\n`
     
     let retIx2 = this.expr()
     
@@ -126,7 +126,7 @@ codegen() {
     this.nextVar = 0
     break
   case Syntax.eof:
-    this.code += `main()`
+    this.code += `main().next()`
     return this.code
   default:
     nonExhaustiveMatch(item.tag)

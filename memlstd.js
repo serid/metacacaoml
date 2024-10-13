@@ -12,7 +12,7 @@ class Bool
 | True()
 end
 fun bool-from-native(b:any()): Bool() =
-  native[|b?BoolᐅTrue():BoolᐅFalse()|]
+  native[|b?yield*BoolᐅTrue():yield*BoolᐅFalse()|]
 
 class Int end
 let zero: Int() = native[|0|]

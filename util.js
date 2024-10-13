@@ -97,12 +97,12 @@ export function nextLast(g, arg) {
 }
 
 export function getOne(i) {
-  const { value, done } = i.next()
+  let { value, done } = i.next()
   assert(value !== undefined, "got undefined")
   return value
 }
 export function getOneOrDef(i, d) {
-  const { value, done } = i.next()
+  let { value, done } = i.next()
   return value === undefined ? d : value
 }
 
