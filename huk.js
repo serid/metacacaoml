@@ -32,29 +32,21 @@ function mkType(o) {
   return o
 }
 
-// The typechecker, named after Yenisei
-export class Huk {
-  constructor(c, ch) {
-    this.c = c // compiler
-    // Map<string, type>
-    this.globals = Object.create(null)
-    
-    this.item = null
-    this.k = -13
-    this.ctx = null
+// The item typechecker, named after Yenisei
+class Huk {
+  constructor(root, item) {
+    this.c = root.c // compiler
+    this.root = root // toplevel tycker
+
+    // item-local state
+    this.item = item
+    this.k = 0
+    this.ctx = []
 
     // Codegen will be querying the methodname
     // Map<int, string>
-    this.methodNameAt = null
+    this.methodNameAt = Object.create(null)
   }
-
-setItem(item) {
-  this.item = item
-  this.k = 0
-  this.ctx = []
-  
-  this.methodNameAt = Object.create(null)
-}
 
 nextIns() {
   return this.item.arena[this.k++]
@@ -217,7 +209,7 @@ infer() {
       return this.ctx[ix].type
     
     // try finding a global
-    let gb = this.globals[ins.name]
+    let gb = this.root.globals[ins.name]
     assert(gb !== undefined, "var not found" + this.c.errorAt(ins.span))
     return this.instantiate(gb.gs, gb.ty)
   case Syntax.app:
@@ -232,7 +224,7 @@ infer() {
       
       let methodName = receiver.name+"/"+ins.metName
       mapInsert(this.methodNameAt, insLocation, methodName)
-      let gb = this.globals[methodName]
+      let gb = this.root.globals[methodName]
       
       assert(gb !== undefined,
         "method not found" + this.c.errorAt(ins.span))
@@ -327,7 +319,7 @@ tyck() {
           args:item.gs.map(mkUse)
         }
     for (let c of item.cons) {
-      mapInsert(this.globals, item.name+"/"+c.name, {gs: item.gs, ty: {tag: "arrow", domain: c.fields.map(x=>x.type), codomain: self
+      mapInsert(this.root.globals, item.name+"/"+c.name, {gs: item.gs, ty: {tag: "arrow", domain: c.fields.map(x=>x.type), codomain: self
       }})
     }
     let ret = Huk.invent("R", item.gs)
@@ -336,12 +328,12 @@ tyck() {
       codomain: mkUse(ret)
     })
     ))
-    mapInsert(this.globals, item.name+"/elim", {gs: item.gs.concat([ret]), ty: {tag: "arrow", domain, codomain: mkUse(ret)}})
+    mapInsert(this.root.globals, item.name+"/elim", {gs: item.gs.concat([ret]), ty: {tag: "arrow", domain, codomain: mkUse(ret)}})
     break
   case Syntax.let:
     this.check(item.retT)
     this.ctx = []
-    mapInsert(this.globals, item.name,
+    mapInsert(this.root.globals, item.name,
     {gs: [], ty: item.retT})
     break
   case Syntax.fun:
@@ -349,7 +341,7 @@ tyck() {
     assert(item.annots.length <= 1)
     let name = getFunName(item)
     write(name)
-    mapInsert(this.globals, name,
+    mapInsert(this.root.globals, name,
     {gs: item.gs, ty: {tag: "arrow", domain: item.bs.map(x => x.type), codomain: item.retT}})
     for (let name of item.gs)
       this.ctx.push({tag: "uni", name})
@@ -377,6 +369,17 @@ tyck() {
     nonExhaustiveMatch(item.tag)
   }
 }
+}
+
+export class RootTyck {
+  constructor(c) {
+    this.c = c // compiler
+    this.globals = Object.create(null)
+  }
+  
+  getItemTyck(item) {
+    return new Huk(this, item)
+  }
 }
 
 export function getFunName(item) {

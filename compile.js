@@ -1,8 +1,8 @@
 import { assert, write, step, Pakulikha } from './util.js';
 
 import { Syntax } from "./syntax.js"
-import { Huk } from "./huk.js"
-import { Codegen } from "./codegen.js"
+import { RootTyck } from "./huk.js"
+import { RootCodegen } from "./codegen.js"
 
 let std = await (await fetch("./memlstd.js")).text()
 
@@ -10,8 +10,9 @@ export class Compiler {
   constructor(src) {
     src = std + src
     this.src = src
-    this.tyck = new Huk(this)
-    this.cg = new Codegen(this)
+    this.tyck = new RootTyck(this)
+    this.itemTyck = null
+    this.cg = new RootCodegen(this)
   }
   
   errorAt(span) {
@@ -25,10 +26,9 @@ export class Compiler {
   analyze(items) {
     for (let item of items) {
       write("analyze", item)
-      this.tyck.setItem(item)
-      this.tyck.tyck()
-      this.cg.setItem(item)
-      this.cg.codegen()
+      this.itemTyck = this.tyck.getItemTyck(item)
+      this.itemTyck.tyck()
+      this.cg.getItemCodegen(item).codegen()
     }
   
     return this.cg.code
