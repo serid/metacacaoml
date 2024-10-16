@@ -315,7 +315,6 @@ export class Syntax {
       this.assertWord("=")
     
       let arena = this.expr()
-      write("function body", arena)
       return {tag: Syntax.fun, span, isMethod,name, gs, bs, retT, annots, arena}
     } else error("expected toplevel" + this.errorAt())
   }

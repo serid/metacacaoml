@@ -62,7 +62,7 @@ static invent(hint, taken) {
 
 // Replace universal variables with existentials
 instantiate(vars, ty) {
-  write("inst", ty)
+  //write("inst", ty)
   // generate fresh evar names
   let mapp = Object.create(null)
   for (let uniName of vars) {
@@ -232,7 +232,7 @@ infer() {
       assert(fty.domain.length > 0)
       this.unify(receiver, fty.domain[0])
     }
-    write("fty", typeToString(fty))
+    //write("fty", typeToString(fty))
     assertEq(fty.tag, "arrow") //todo evar
     
     for (let i = isMethod?1:0; i < fty.domain.length; i++) {
@@ -240,7 +240,7 @@ infer() {
       // this is necessary since context grows in information as we check arguments
       // todo: performance: only substitute remaining arguments
       fty = this.substitute(fty)
-      write("new fty", typeToString(fty), this.ctx)
+      //write("new fty", typeToString(fty), this.ctx)
       
       let par = fty.domain[i]
       let ins2 = this.nextIns()
@@ -284,7 +284,7 @@ infer() {
   
 check(ty) {
   let ins = this.nextIns()
-  write("check", ins, ty)
+  //write("check", ins, ty)
   switch (ins.tag) {
   case Syntax.native:
     return
@@ -293,7 +293,7 @@ check(ty) {
   case Syntax.app:
     this.k--
     let ty2 = this.infer()
-    write("inferred for check", ty2)
+    //write("inferred for check", ty2)
     this.unify(this.substitute(ty2),
       this.substitute(ty))
     return
@@ -310,7 +310,6 @@ tyck() {
   let item = this.item
   switch (item.tag) {
   case Syntax.cls:
-    write(fixtures,item.name,fixtures[item.name])
     fixtures[item.name] = (...xs)=>({
       tag:"cons", name:item.name, args:xs})
     
@@ -340,7 +339,6 @@ tyck() {
     let beforeFun = performance.now()
     assert(item.annots.length <= 1)
     let name = getFunName(item)
-    write(name)
     mapInsert(this.root.globals, name,
     {gs: item.gs, ty: {tag: "arrow", domain: item.bs.map(x => x.type), codomain: item.retT}})
     for (let name of item.gs)
