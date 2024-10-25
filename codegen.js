@@ -1,4 +1,4 @@
-import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, mapGet, step, nextLast, it, findUniqueIndex, map, join } from './util.js';
+import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, mapGet, step, nextLast, findUniqueIndex, map, join } from './util.js';
 
 import { Syntax } from "./syntax.js"
 
@@ -98,7 +98,7 @@ expr() {
       domain.push(this.expr())
     this.k++
     let codomain = this.expr()
-    return `{tag:"arrow", domain:[${join(it(domain))}], codomain:${codomain}}`
+    return `{tag:"arrow", domain:[${join(domain)}], codomain:${codomain}}`
   default:
     nonExhaustiveMatch(ins.tag)
   }
@@ -112,11 +112,11 @@ codegen() {
   case Syntax.cls:
     let elimCode = ""
     let fullname = mangle(item.name+"/elim")
-    let ps = join(map(item.cons, x=>x.name))
+    let ps = join(map(item.conss, x=>x.name))
     elimCode += `function* ${fullname}(self, ${ps}) {\n  switch (self.tag) {\n`
-    for (let c of item.cons) {
+    for (let c of item.conss) {
       let ps = c.fields.map(x=>x.name)
-      let bs = join(it(ps))
+      let bs = join(ps)
       let fullname = mangle(item.name+"/"+c.name)
       this.pushCode(`function* ${fullname}(${bs}) {\n  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`)
       let as = join(map(ps, x=>"self."+x))

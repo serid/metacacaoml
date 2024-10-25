@@ -7,7 +7,7 @@ new Compiler(`
 fun foo(): String = ""
 @Fails(error: "A" is not a subtype of "B" at "")
 fun f('A 'B x:A): B = x
-`)//.compile()
+`, false).compile()
 }
 
 tyckTest()
@@ -23,7 +23,7 @@ fun main(): Unit =
   let(iterator.map(Int/increment)) λincremented.
   write(incremented.to-array())
 `
-let c = new Compiler(src)
+let c = new Compiler(src, true)
 //write([...new Syntax(c).syntax()])
 let obj = c.compile()
 //document.getElementById("out").innerText = obj

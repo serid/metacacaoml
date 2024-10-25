@@ -112,12 +112,14 @@ export function last(arr) {
   return arr[arr.length-1]
 }
 
-export function* it(arr) {
+// array to iterator
+export function* makeIt(arr) {
   for (let x of arr) yield x
 }
 
-export function range(n) {
-  
+// ensures argument is an iterator
+export function it(xs) {
+  return "next" in xs ? xs : makeIt(xs)
 }
 
 export function findUniqueIndex(xs, f) {
@@ -143,13 +145,12 @@ export function* filter(i, f) {
 }
 
 export function foldl(i, s, c) {
-  for (let x of i) {
-    s = c(s, x)
-  }
+  for (let x of i) s = c(s, x)
   return s
 }
 
 export function join(i, sep=", ") {
+  i = it(i)
   return foldl(i, getOneOrDef(i, ""), (s, x) => s + sep + x)
 }
 

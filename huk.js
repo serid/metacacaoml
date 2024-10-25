@@ -54,16 +54,23 @@ nextIns() {
   return this.item.arena[this.k++]
 }
 
-// invent a name like hint but not present in "taken"
-static invent(hint, taken) {
-  let name = hint
-  while (taken.includes(name))
-    name += "0"
-  return name
+ins() {
+  return this.item.arena[this.k]
 }
 
+// invent a name like hint but not present in "taken"
+static invent(hint, taken) {
+  while (taken.includes(hint)) {
+    let [_, alpha, num] =
+      hint.match(/(\D*)(\d*)/)
+    hint = alpha+(num-0+1)
+  }
+  return hint
+}
+
+// normalization by jit compilation
 normalize(tyExpr) {
-  //write("normalize", tyExpr)
+  //this.c.log("normalize", tyExpr)
   this.root.normalCounter += 1
   // prepare environment (it will be passed in params)
   let env = Object.create(null)
@@ -78,14 +85,14 @@ normalize(tyExpr) {
   let cg = new RootCodegen(this.c, fixtureNames)
   cg.getItemCodegen(tyExpr).codegen()
   let obj = cg.code
-  //write("obj", env, obj)
+  //this.c.log("obj", env, obj)
   let g = new GeneratorFunction(...map(envv,x=>x[0]), obj)(...map(envv,x=>x[1]))
   return nextLast(g)
 }
 
 // Replace universal variables with existentials
 instantiate(vars, ty) {
-  //write("inst", ty)
+  //this.c.log("inst", ty)
   // generate fresh evar names
   let mapp = Object.create(null)
   for (let uniName of vars) {
@@ -100,7 +107,7 @@ instantiate(vars, ty) {
 }
 
 static instantiate0(varMap, ty) {
-  //write("instantiate0", varMap, ty)
+  //this.c.log("instantiate0", varMap, ty)
   switch (ty.tag) {
   case "cons":
     return {tag: "cons",
@@ -126,17 +133,20 @@ static instantiate0(varMap, ty) {
   
 // bidir.pdf: [Г]A
 substitute(ty) {
+  //this.c.log(typeToString(ty))
   switch (ty.tag) {
   case "any":
   case "use":
     return ty
   case "euse":
-    let ix = findUniqueIndex(this.ctx, ({tag, name}) => tag === "esolve" && name === ty.name)
+    let ix = findUniqueIndex(this.ctx, x=>
+      x.tag === "esolve" && x.name === ty.name)
     
     // evar not solved, but is it even declared? 
     if (ix === -1)
-      ix = findUniqueIndex(this.ctx, ({tag, name}) => tag === "evar" && name === ty.name)
-    assertL(ix !== -1, () => "evar not found" + this.c.errorAt(ins.span)) // invariant
+      ix = findUniqueIndex(this.ctx, x=>
+        x.tag === "evar" && x.name === ty.name)
+    assertL(ix !== -1, () => "evar not found" + this.c.errorAt(this.ins().span)) // invariant
     return this.ctx[ix].solution !== undefined ? this.ctx[ix].solution :
       ty
   case "cons":
@@ -155,7 +165,7 @@ substitute(ty) {
 }
 
 solveEvarTo(name, solution) {
-  //write("solve evar", name, solution)
+  //this.c.log("solve evar", name, solution)
   assert(!this.ctx.some(
     x => x.tag === "esolve" && x.name === name),
     "evar already solved") // invariant
@@ -219,25 +229,25 @@ unify(ty1, ty2) {
 infer() {
   let insLocation = this.k
   let ins = this.nextIns()
-  //write("infer", ins, this.ctx)
+  //this.c.log("infer", ins, this.ctx)
   switch (ins.tag) {
   case Syntax.strlit:
-    return mkUse("String")
+    return {tag:"cons", name:"String", args:[]}
   case Syntax.native:
     return {tag: "any"}
   case Syntax.use:
     // try finding a local
-    let ix = this.ctx.findLastIndex(({tag, name}) => tag === "var" && name === ins.name)
+    let ix = this.ctx.findLastIndex(x=>
+      x.tag === "var" && x.name === ins.name)
     if (ix !== -1)
       return this.ctx[ix].ty
     
     // try finding a global
     let gb = this.root.globals[ins.name]
-    assert(gb !== undefined, "var not found" + this.c.errorAt(ins.span))
+    if (gb === undefined) error("var not found" + this.c.errorAt(ins.span))
     return this.instantiate(gb.gs, gb.ty)
   case Syntax.app:
     let isMethod = ins.metName !== null
-    //write("infer app")
     let fty
     if (!isMethod)
       fty = this.infer()
@@ -255,7 +265,7 @@ infer() {
       assert(fty.domain.length > 0)
       this.unify(receiver, fty.domain[0])
     }
-    //write("fty", typeToString(fty))
+    //this.c.log("fty", typeToString(fty))
     assertEq(fty.tag, "arrow") //todo evar
     
     for (let i = isMethod?1:0; i < fty.domain.length; i++) {
@@ -263,20 +273,19 @@ infer() {
       // this is necessary since context grows in information as we check arguments
       // todo: performance: only substitute remaining arguments
       fty = this.substitute(fty)
-      //write("new fty", typeToString(fty), this.ctx)
+      //this.c.log("new fty", typeToString(fty), this.ctx)
       
       let par = fty.domain[i]
-      let ins2 = this.nextIns()
-      if (ins2.tag === Syntax.endapp)
-        error("expected argument of type " +
+      let ins2 = this.ins()
+      assert(ins2.tag !== Syntax.endapp, () => "expected argument of type " +
         typeToString(par) +
         this.c.errorAt(ins2.span))
       // simple application
       if (ins2.tag !== Syntax.applam) {
-        this.k--
         this.check(par)
         continue
       }
+      this.k++
       // application of trailing lambda
       assertEq(par.tag, "arrow")
       assertEq(par.domain.length, ins2.ps.length)
@@ -298,7 +307,7 @@ infer() {
       }
     }
 
-    assertEq((this.nextIns()).tag, Syntax.endapp) // invariant
+    assertEq(this.nextIns().tag, Syntax.endapp) // invariant
     return this.substitute(fty.codomain)
   default:
     nonExhaustiveMatch(ins.tag)
@@ -307,7 +316,7 @@ infer() {
   
 check(ty) {
   let ins = this.nextIns()
-  //write("check", ins, typeToString(ty))
+  //this.c.log("check", ins, typeToString(ty))
   switch (ins.tag) {
   case Syntax.native:
     return
@@ -316,7 +325,7 @@ check(ty) {
   case Syntax.app:
     this.k--
     let ty2 = this.infer()
-    //write("inferred for check", ty2)
+    //this.c.log("inferred for check", ty2)
     this.unify(this.substitute(ty2),
       this.substitute(ty))
     return
@@ -335,13 +344,13 @@ tyck() {
       ? {tag:"cons", name:item.name, args:[]}
       : function*(...xs){
         return {tag:"cons", name:item.name, args:xs}
-    })
+      })
     
     // add generics to ctx
     for (let name of item.gs)
       this.ctx.push({tag: "uni", name})
     
-    let normalConss = item.cons.map(c=>({
+    let normalConss = item.conss.map(c=>({
       ...c, fields:c.fields.map(f=>
         this.normalize(f.type)
       )
@@ -369,7 +378,7 @@ tyck() {
     {gs: [], ty})
     break
   case Syntax.fun:
-    let beforeFun = performance.now()
+    //let beforeFun = performance.now()
     assert(item.annots.length <= 1)
 
     // normalize the function type
@@ -398,17 +407,18 @@ tyck() {
     if (item.annots.length === 0)
       this.check(codomain)
     else {
+      let expected = item.annots[0].text
       try {
         this.check(codomain)
-        error("[no error]")
+        error("expected error: "+expected)
       } catch (e) {
-        assertEq(e.message, item.annots[0].text)
+        assertEq(e.message, expected)
       }
     }
     
     // check if all evars are solved? no
     //assert(this.ctx.)
-    write(`fun ${name} analysis time`, performance.now()-beforeFun)
+    //if (this.c.logging) write(`fun ${name} analysis time`, performance.now()-beforeFun)
     break
   case Syntax.eof:
     break

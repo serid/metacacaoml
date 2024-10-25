@@ -1,4 +1,4 @@
-import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, getOne, it, findUniqueIndex, map } from './util.js';
+import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, getOne, findUniqueIndex, map } from './util.js';
 
 function isPrefix(s, i, w) {
   if (w.length > s.length - i) return false
@@ -9,14 +9,14 @@ function isPrefix(s, i, w) {
 
 export class Syntax {
   static cls = Symbol("cls")
-  static strlit = "strlit"
-  static fun = "fun"
-  static native = "native"
-  static app = "app"
-  static endapp = "endapp"
-  static use = "use"
-  static endfun = "endfun"
-  static eof = "eof"
+  static strlit = Symbol("strlit")
+  static fun = Symbol("fun")
+  static native = Symbol("native")
+  static app = Symbol("app")
+  static endapp = Symbol("endapp")
+  static use = Symbol("use")
+  static endfun = Symbol("endfun")
+  static eof = Symbol("eof")
   static applam = Symbol("applam")
   static let = Symbol("let")
   static arrow = Symbol("arrow")
@@ -282,7 +282,7 @@ export class Syntax {
       let name = this.assertIdent()
       let gs = this.generics()
 
-      let cons = []
+      let conss = []
       while (!this.tryWord("end")) {
         this.assertWord("|")
         let name = this.assertIdent()
@@ -297,10 +297,10 @@ export class Syntax {
           })
         }
         
-        cons.push({name, fields})
+        conss.push({name, fields})
       }
       
-      return {tag: Syntax.cls, span, name, gs, cons}
+      return {tag: Syntax.cls, span, name, gs, conss}
     } else if (this.tryWord("let")) {
       let name = this.assertIdent()
       this.assertWord(":")
