@@ -1,6 +1,7 @@
-import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, mapInsert, step, nextLast, it, findUniqueIndex, map, filter, join } from './util.js';
+import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, mapInsert, step, nextLast, it, findUniqueIndex, map, filter, join, GeneratorFunction } from './util.js';
 
 import { Syntax } from "./syntax.js"
+import { RootCodegen } from "./codegen.js"
 
 function typeToString(ty) {
   switch (ty.tag) {
@@ -46,6 +47,7 @@ class Huk {
     // Codegen will be querying the methodname
     // Map<int, string>
     this.methodNameAt = Object.create(null)
+    this.funName = null
   }
 
 nextIns() {
@@ -58,6 +60,27 @@ static invent(hint, taken) {
   while (taken.includes(name))
     name += "0"
   return name
+}
+
+normalize(tyExpr) {
+  //write("normalize", tyExpr)
+  this.root.normalCounter += 1
+  // prepare environment (it will be passed in params)
+  let env = Object.create(null)
+  env.fixtures = this.root.fixtures
+  for (let x of this.ctx) {
+    if (x.tag === "uni")
+      env[x.name] = {tag:"use",name:x.name}
+  }
+  let envv = Object.entries(env)
+  
+  let fixtureNames = Object.keys(this.root.fixtures)
+  let cg = new RootCodegen(this.c, fixtureNames)
+  cg.getItemCodegen(tyExpr).codegen()
+  let obj = cg.code
+  //write("obj", env, obj)
+  let g = new GeneratorFunction(...map(envv,x=>x[0]), obj)(...map(envv,x=>x[1]))
+  return nextLast(g)
 }
 
 // Replace universal variables with existentials
@@ -206,7 +229,7 @@ infer() {
     // try finding a local
     let ix = this.ctx.findLastIndex(({tag, name}) => tag === "var" && name === ins.name)
     if (ix !== -1)
-      return this.ctx[ix].type
+      return this.ctx[ix].ty
     
     // try finding a global
     let gb = this.root.globals[ins.name]
@@ -262,7 +285,7 @@ infer() {
         this.ctx.push({
           tag: "var",
           name: ps[j],
-          type: par.domain[j]
+          ty: par.domain[j]
         })
       }
       this.check(par.codomain)
@@ -284,7 +307,7 @@ infer() {
   
 check(ty) {
   let ins = this.nextIns()
-  //write("check", ins, ty)
+  //write("check", ins, typeToString(ty))
   switch (ins.tag) {
   case Syntax.native:
     return
@@ -303,54 +326,80 @@ check(ty) {
 }
   
 tyck() {
-  // A container for functions and constants to be used during compile-time evaluation
-  // It's an extension of global object so generated code can refer to js builtins too
-  globalThis.fixtures = Object.create(globalThis)
-  
   let item = this.item
   switch (item.tag) {
   case Syntax.cls:
-    fixtures[item.name] = (...xs)=>({
-      tag:"cons", name:item.name, args:xs})
+    // add type constructor to fixtures
+    mapInsert(this.root.fixtures, item.name,
+      item.gs.length===0
+      ? {tag:"cons", name:item.name, args:[]}
+      : function*(...xs){
+        return {tag:"cons", name:item.name, args:xs}
+    })
     
+    // add generics to ctx
+    for (let name of item.gs)
+      this.ctx.push({tag: "uni", name})
+    
+    let normalConss = item.cons.map(c=>({
+      ...c, fields:c.fields.map(f=>
+        this.normalize(f.type)
+      )
+    }))
     let self = {tag: "cons", 
-          name:item.name,
-          args:item.gs.map(mkUse)
-        }
-    for (let c of item.cons) {
-      mapInsert(this.root.globals, item.name+"/"+c.name, {gs: item.gs, ty: {tag: "arrow", domain: c.fields.map(x=>x.type), codomain: self
+      name:item.name,
+      args:item.gs.map(mkUse)
+    }
+    for (let c of normalConss) {
+      mapInsert(this.root.globals, item.name+"/"+c.name, {gs: item.gs, ty: {tag: "arrow", domain: c.fields, codomain: self
       }})
     }
     let ret = Huk.invent("R", item.gs)
-    let domain = [self].concat(item.cons.map(c=>({tag: "arrow",
-      domain: c.fields.map(f=>f.type),
+    let domain0 = [self].concat(normalConss.map(c=>({tag: "arrow",
+      domain: c.fields,
       codomain: mkUse(ret)
     })
     ))
-    mapInsert(this.root.globals, item.name+"/elim", {gs: item.gs.concat([ret]), ty: {tag: "arrow", domain, codomain: mkUse(ret)}})
+    mapInsert(this.root.globals, item.name+"/elim", {gs: item.gs.concat([ret]), ty: {tag: "arrow", domain: domain0, codomain: mkUse(ret)}})
     break
   case Syntax.let:
-    this.check(item.retT)
-    this.ctx = []
+    let ty = this.normalize(item.retT)
+    this.check(ty)
     mapInsert(this.root.globals, item.name,
-    {gs: [], ty: item.retT})
+    {gs: [], ty})
     break
   case Syntax.fun:
     let beforeFun = performance.now()
     assert(item.annots.length <= 1)
-    let name = getFunName(item)
-    mapInsert(this.root.globals, name,
-    {gs: item.gs, ty: {tag: "arrow", domain: item.bs.map(x => x.type), codomain: item.retT}})
+
+    // normalize the function type
+    let normalParams = []
     for (let name of item.gs)
       this.ctx.push({tag: "uni", name})
-    for (let {name, type} of item.bs)
-      this.ctx.push({tag: "var", name, type})
+    for (let {name, type} of item.bs) {
+      let ty = this.normalize(type)
+      normalParams.push(ty)
+      this.ctx.push({tag: "var", name, ty})
+    }
+    let domain = normalParams
+    let codomain = this.normalize(item.retT)
+
+    let name
+    if (item.isMethod) {
+      assert(item.bs.length >= 1)
+      assertEq(domain[0].tag, "cons")
+      name = domain[0].name + "/" + item.name
+    } else name = item.name
+    this.funName = name
+
+    mapInsert(this.root.globals, name,
+    {gs: item.gs, ty: {tag: "arrow", domain, codomain}})
 
     if (item.annots.length === 0)
-      this.check(item.retT)
+      this.check(codomain)
     else {
       try {
-        this.check(item.retT)
+        this.check(codomain)
         error("[no error]")
       } catch (e) {
         assertEq(e.message, item.annots[0].text)
@@ -372,22 +421,14 @@ tyck() {
 export class RootTyck {
   constructor(c) {
     this.c = c // compiler
+    // types of global declarations
     this.globals = Object.create(null)
+    // A container for functions and constants to be used during compile-time evaluation
+    this.fixtures = Object.create(null)
+    this.normalCounter = 0
   }
   
   getItemTyck(item) {
     return new Huk(this, item)
   }
-}
-
-export function getFunName(item) {
-  if (item.isMethod) {
-    assert(item.bs.length >= 1)
-    assertEq(item.bs[0].type.tag, "cons")
-    return item.bs[0].type.name + "/" + item.name
-  } else return item.name
-}
-
-function normalize(inss) {
-  // Tab to edit
 }

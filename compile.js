@@ -12,7 +12,7 @@ export class Compiler {
     this.src = src
     this.tyck = new RootTyck(this)
     this.itemTyck = null
-    this.cg = new RootCodegen(this)
+    this.cg = new RootCodegen(this, [])
   }
   
   errorAt(span) {
@@ -25,12 +25,13 @@ export class Compiler {
   
   analyze(items) {
     for (let item of items) {
-      write("analyze", item)
+      //write("analyze", item)
       this.itemTyck = this.tyck.getItemTyck(item)
       this.itemTyck.tyck()
       this.cg.getItemCodegen(item).codegen()
     }
-  
+
+    console.log(`normalizations count: ` + this.tyck.normalCounter)
     return this.cg.code
   }
 }

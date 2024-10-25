@@ -1,7 +1,6 @@
 import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, mapGet, step, nextLast, it, findUniqueIndex, map, join } from './util.js';
 
 import { Syntax } from "./syntax.js"
-import { getFunName } from "./huk.js"
 
 function mangle(path) {
   // hazard: unicode!!
@@ -12,13 +11,17 @@ function mangle(path) {
   return path
 }
 
-export class ItemCodegen {
+class ItemCodegen {
   constructor(root, item) {
     this.c = root.c
-    this.root = root
-    this.item = item // toplevel codegen
+    this.root = root // toplevel codegen
+    this.item = item
     this.k = 0
     this.nextVar = 0
+  }
+  
+  ins() {
+    return this.item.arena[this.k]
   }
 
   nextIns() {
@@ -48,7 +51,11 @@ expr() {
   case Syntax.native:
     return ins.code
   case Syntax.use:
-    return mangle(ins.name)
+    let name = ins.name
+    return mangle(
+      this.root.fixtureNames.includes(name)
+      ? "fixtures."+name
+      : name)
   case Syntax.app:
     let ixs = []
     // generate strict arguments
@@ -80,6 +87,18 @@ expr() {
     
     this.pushCode("  );\n")
     return retIx
+    
+  // types
+  
+  case Syntax.any:
+    return `{tag:"any"}`
+  case Syntax.arrow:
+    let domain = []
+    while (this.ins().tag !== Syntax.endarrow)
+      domain.push(this.expr())
+    this.k++
+    let codomain = this.expr()
+    return `{tag:"arrow", domain:[${join(it(domain))}], codomain:${codomain}}`
   default:
     nonExhaustiveMatch(ins.tag)
   }
@@ -111,16 +130,16 @@ codegen() {
     this.pushCode(`const ${mangle(item.name)} = (function*() {\n`)
     let retIx = this.expr()
     this.pushCode(`  return ${retIx}\n})().next().value;\n`)
-    this.nextVar = 0
     break
   case Syntax.fun:
     let bs = map(item.bs,x=>mangle(x.name))
-    this.pushCode(`function* ${mangle(getFunName(item))}(${join(bs)}) {\n`)
-    
+    this.pushCode(`function* ${mangle(this.c.itemTyck.funName)}(${join(bs)}) {\n`)
     let retIx2 = this.expr()
     
     this.pushCode(`  return ${retIx2}\n}\n`)
-    this.nextVar = 0
+    break
+  case Syntax.nakedfun:
+    this.pushCode(`  return ${this.expr()}`)
     break
   case Syntax.eof:
     this.pushCode(`main().next()`)
@@ -132,9 +151,10 @@ codegen() {
 }
 
 export class RootCodegen {
-  constructor(c) {
+  constructor(c, fixtureNames) {
     this.c = c // compiler
     this.code = `"use strict";\n`
+    this.fixtureNames = fixtureNames
   }
   
   getItemCodegen(item) {

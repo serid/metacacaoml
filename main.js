@@ -16,7 +16,7 @@ let src = `
 # What follows is a GSLR(1) parser generation library for Meml
 
 
-fun main(): Unit() =
+fun main(): Unit =
   let(native[|[1, 2, 3]|]) λarray.
   let(write(array)) λ-.
   let(Array/to-iter(array)) λiterator.

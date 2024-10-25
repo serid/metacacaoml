@@ -108,8 +108,12 @@ export function getOneOrDef(i, d) {
 
 
 
-export function* it(array) {
-  for (let x of array) yield x
+export function last(arr) {
+  return arr[arr.length-1]
+}
+
+export function* it(arr) {
+  for (let x of arr) yield x
 }
 
 export function range(n) {
@@ -169,3 +173,6 @@ class Fuel {
 }
 
 export let fuel = new Fuel(1000)
+
+// great stuff right here
+export const GeneratorFunction = function* () {}.constructor;

@@ -22,6 +22,7 @@ export class Syntax {
   static arrow = Symbol("arrow")
   static any = Symbol("any")
   static endarrow = Symbol("endarrow")
+  static nakedfun = Symbol("naked-fun")
 
   constructor(compiler) {
     this.compiler = compiler
@@ -166,7 +167,10 @@ export class Syntax {
   }
   
   type() {
-    return this.#normalize(it(this.expr()))
+    return {tag: Syntax.nakedfun,
+      span: this.i,
+      arena: this.expr()
+    }
   }
   
   idents(end) {
@@ -212,7 +216,7 @@ export class Syntax {
     } else if (this.tryWord("(")) {
       insQueue = this.expr()
       this.assertWord(")")
-    } else if (this.tryWord("any()")) {
+    } else if (this.tryWord("@any")) {
       return [{tag:Syntax.any, span}]
     } else if (this.tryWord("[")) {
       insQueue.push({tag:Syntax.arrow, span:this.i})

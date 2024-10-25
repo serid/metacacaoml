@@ -4,28 +4,30 @@ fun id('A x:A): A = x
 class Unit
 | C()
 end
-fun anyways(-:any()): Unit() = Unit/C()
-fun and('A -:any() other:A): A = other
+fun anyways(-:@any): Unit = Unit/C()
+fun and('A -:@any other:A): A = other
 
 class Bool
 | False()
 | True()
 end
-fun bool-from-native(b:any()): Bool() =
+fun bool-from-native(b:@any): Bool =
   native[|b?yield*BoolᐅTrue():yield*BoolᐅFalse()|]
 
 class Int end
-let zero: Int() = native[|0|]
-fun .increment(x:Int()): Int() = native[|x+1|]
-fun .lt(x:Int() y:Int()): Bool() =
+let zero: Int = native[|0|]
+fun .increment(x:Int): Int = native[|x+1|]
+fun .lt(x:Int y:Int): Bool =
   bool-from-native(native[|x<y|])
+  
+class String end
 
 class Box 'A
 | New(A)
 end
 fun .get('A self:Box(A)): A =
   native[|self._0|]
-fun .set('A self:Box(A) x:A): Unit() =
+fun .set('A self:Box(A) x:A): Unit =
   anyways(native[|self._0 = x|])
 
 class Option 'A
@@ -40,18 +42,18 @@ let -check1: [Option(Int) []String [Int]String] String
   = Option/elim
 
 class Array 'A end
-fun new-array(): Array(A) = native[|[]|]
-fun .length('A self:Array(A)): Int() =
+fun new-array('A): Array(A) = native[|[]|]
+fun .length('A self:Array(A)): Int =
   native[|self.length|]
-fun .get('A self:Array(A) i:Int()): A =
+fun .get('A self:Array(A) i:Int): A =
   native[|self[i]|]
-fun .push(self:Array(A) x:A): Unit() =
+fun .push('A self:Array(A) x:A): Unit =
   anyways(native[|self.push(x)|])
 
 # [A]B is a type of functions from A to B.
 # Function calls are parenthesised.
 fun let('A 'B x:A f:[A]B): B = f(x)
-fun write('A x:A): Unit() = anyways(
+fun write('A x:A): Unit = anyways(
   native[|console.log(x)|])
   
 class Iter 'A
@@ -59,7 +61,7 @@ class Iter 'A
 end
 fun .unpack('A i:Iter(A)): []Option(A) =
   Iter/elim(i id)
-fun .for-each('A i:Iter(A) f:[A]Unit()): Unit() = Option/elim(i.unpack()())
+fun .for-each('A i:Iter(A) f:[A]Unit): Unit = Option/elim(i.unpack()())
   { . Unit/C() }
   { x. and(f(x) i.for-each(f)) }
 fun .to-array('A i:Iter(A)): Array(A) =
