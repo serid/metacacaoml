@@ -372,6 +372,7 @@ tyck() {
     mapInsert(this.root.globals, item.name+"/elim", {gs: item.gs.concat([ret]), ty: {tag: "arrow", domain: domain0, codomain: mkUse(ret)}})
     break
   case Syntax.let:
+    let kind = this.root.getItemTyck(item.retT).tyck()
     let ty = this.normalize(item.retT)
     this.check(ty)
     mapInsert(this.root.globals, item.name,
@@ -420,6 +421,9 @@ tyck() {
     //assert(this.ctx.)
     //if (this.c.logging) write(`fun ${name} analysis time`, performance.now()-beforeFun)
     break
+  case Syntax.nakedfun:
+    this.check({tag:"cons", name:"Type", args:[]})
+    break
   case Syntax.eof:
     break
   default:
@@ -431,10 +435,10 @@ tyck() {
 export class RootTyck {
   constructor(c) {
     this.c = c // compiler
-    // types of global declarations
+    // A fixture is a value or a function present at compilation time. C++ calls this constexpr and in Zig it's comptime
+    // types and fixture values of global declarations
+    // Map<string, {ty, value}>
     this.globals = Object.create(null)
-    // A container for functions and constants to be used during compile-time evaluation
-    this.fixtures = Object.create(null)
     this.normalCounter = 0
   }
   
