@@ -4,7 +4,7 @@ import { Syntax } from "./syntax.js"
 import { RootTyck } from "./huk.js"
 import { RootCodegen } from "./codegen.js"
 
-let std = await (await fetch("./memlstd.js")).text()
+let std = await Deno.readTextFile("./memlstd.js")
 
 export class Compiler {
   constructor(src, logging) {
