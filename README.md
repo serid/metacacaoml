@@ -11,11 +11,15 @@ Its core features:
 | Interfaces | Typeclasses | ❌ |
 | Compilation-time metaprogramming | Templates | ❌ |
 
-For code samples see ./main.js and  ./memlstd.js
+For code samples see `./main.js` and `./memlstd.js`
 
-## The Idea
-Minimizing the feature set is a popular criteria in designing languages. In MetaCaCaOML I tried to derive a minimal set of features while still yielding a concise and expressive language with good ergonomics because it is a fun challenge in building abstractions.
+## The Big Idea
+I find myself compelled by the procedural paradigm where programs are composed of data structures and imperative algorithms mutating them. This paradigm is well-supported among existing languages, which also facilitate higher-order functions — an indispensable tool for encoding abstract algorithms. At the same time, these languages often include effectful features such as exceptions, generator and async functions, which cannot be used inside lambdas, limiting their composition with higher-order functions. For example:
 
-Initially, what inspired me on this quest for min-max expressiveness was how in low-level languages like C++ and Rust, GC could be implemented in a third-party library with no compiler modification.
+```typescript
+let urls: string[] = ["example.net", "google.com", "wikipedia.org"]
+// error: `every` is a higher-order function, but it only accepts plain non-async lambdas
+let all_ok: boolean = urls.every(async url => (await fetch(url)).ok)
+```
 
-After that I researched for ways to do the same with green-threads (another high-level feature akin to GC) and discovered delimited continuations, which conveniently also subsume exception handling. Then finally I arrived at [this article by Li-yao Xia](https://blog.poisson.chat/posts/2023-01-02-del-cont-examples.html) detailing a mechanism for expressing algebraic effects through del conts and what appears to be implicit variables. At this point I decided to throw these concepts together and see what patterns will emerge while coding in this experimental language.
+There were devised plenty ways to alleviate such vexation. MetaCaCaOML employs algebraic effects, as described in [this article by Li-yao Xia](https://blog.poisson.chat/posts/2023-01-02-del-cont-examples.html), to address this limitation. Although this approach may seem low-level and unwieldy, only compiler machinery necessary to support it are delimited continuations, which are relatively easy to implement compared to a full-fledged algebraic effect system as found in Koka. In this spirit, MetaCaCaOML borrows many features from Haskell but is designed as a procedural language with minimal feature set, avoiding complications of OOP and pure FP.
