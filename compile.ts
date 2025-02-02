@@ -1,29 +1,36 @@
-import { assert, toString, write, step, Pakulikha } from './util.js';
+import { toString } from './util.ts'
 
-import { Syntax } from "./syntax.js"
-import { RootTyck } from "./huk.js"
-import { RootCodegen } from "./codegen.js"
+import { Syntax } from "./syntax.ts"
+import { Huk, RootTyck } from "./huk.ts"
+import { RootCodegen } from "./codegen.ts"
 
-let std = await Deno.readTextFile("./memlstd.js")
+const std = await globalThis["Deno"].readTextFile("./memlstd.js")
 
 export class Compiler {
-  constructor(src, logging) {
+  src: string
+  logging: boolean
+  logs: string
+  tyck: RootTyck
+  itemTyck: Huk
+  cg: RootCodegen
+
+  constructor(src: string, logging: boolean) {
     this.src = std + src
     this.logging = logging
     this.logs = ""
     this.tyck = new RootTyck(this)
-    this.itemTyck = null
+    this.itemTyck = <Huk><unknown>null
     this.cg = new RootCodegen(this, [])
   }
   
-  log(...xs) {
+  log(...xs: any[]) {
     xs.forEach(x=>{
       this.logs += toString(x) + " "
     })
     this.logs += "\n\n"
   }
   
-  errorAt(span) {
+  errorAt(span: number) {
     return ` at "${this.src.substring(span, span + 20)}"`
   }
   
@@ -36,7 +43,7 @@ export class Compiler {
     }
   }
   
-  analyze(items) {
+  analyze(items: Iterable<any>) {
     for (let item of items) {
       this.log("analyze", item)
       this.itemTyck = this.tyck.getItemTyck(item)

@@ -1,13 +1,18 @@
-import { assert } from './util.js'
+import { assert } from './util.ts'
 
-export function spawn(f) {
+export function spawn(f: TimerHandler) {
   setTimeout(f)
 }
 
-export class Condition {
+export class Condition<A> {
+  v: Promise<A>
+  f: (_: A) => void
+  r: (_: any) => void
+  settled: boolean
+
   constructor() {
-    let f
-    let r
+    let f: any
+    let r: any
     this.v = new Promise((f_, r_) => {
       f = f_
       r = r_
@@ -17,24 +22,28 @@ export class Condition {
     this.settled = false
   }
 
-  fulfill(x) {
+  fulfill(x: A) {
     this.settled = true
     this.f(x)
   }
 
-  retract(x) {
+  retract(x: any) {
     this.settled = true
     this.r(x)
   }
 
-  then(a, b) {
-    this.v.then(a, b)
+  then(a: (_: A) => any, b: (_: any) => any) {
+    return this.v.then(a, b)
   }
 }
 
 export class Mutex {
+  queue: Condition<void>[]
+  locked: boolean
+
   constructor() {
     this.queue = []
+    this.locked = false
   }
 
   async lock() {
@@ -42,7 +51,7 @@ export class Mutex {
       this.locked = true
       return
     }
-    let condition = new Condition()
+    let condition = new Condition<void>()
     this.queue.push(condition)
     await condition
   }
@@ -53,18 +62,21 @@ export class Mutex {
       this.locked = false
       return
     }
-    this.queue.shift().fulfill()
+    this.queue.shift()!.fulfill()
   }
 }
 
 // Single producer single consumer channel
-export class Spsc {
+export class Spsc<A> {
+  readBarrier: Condition<A>
+  writeBarrier: Condition<void>
+
   constructor() {
     this.readBarrier = new Condition()
     this.writeBarrier = new Condition()
   }
 
-  async send(x) {
+  async send(x: A) {
     assert(!this.readBarrier.settled)
     this.readBarrier.fulfill(x)
     await this.writeBarrier
@@ -82,20 +94,23 @@ export class Spsc {
 }
 
 // Wraps an Spsc to allow unshifting values
-export class Tunguska {
-  constructor(ch) {
+export class Tunguska<A> {
+  v: Spsc<A>
+  stack: A[]
+
+  constructor(ch: Spsc<A>) {
     this.v = ch
     this.stack = []
   }
   
-  unshift(x) {
+  unshift(x: A) {
     this.stack.push(x)
   }
   
   async recv() {
     if (this.stack.length <= 0)
       return await this.v.recv()
-    return this.stack.pop()
+    return <A>this.stack.pop()
   }
   
   async peek() {
@@ -103,17 +118,4 @@ export class Tunguska {
       this.unshift(await this.v.recv())
     return this.stack[this.stack.length-1]
   }
-}
-
-export function tee(ch, f, g) {
-  let ch1 = new Spsc()
-  let ch2 = new Spsc()
-  let a = f(ch1)
-  let b = g(ch2)
-  spawn(async () => { while (true) {
-    let x = await ch.recv()
-    await a.send(x)
-    await b.send(x)
-  }})
-  return Promise.all([a, b])
 }

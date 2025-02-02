@@ -1,6 +1,6 @@
-import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, step, nextLast, getOne, findUniqueIndex, map } from './util.js';
+import { error, assert, assertL, assertEq, fuel, nonExhaustiveMatch, getOne } from './util.ts'
 
-function isPrefix(s, i, w) {
+function isPrefix(s: string, i: number, w: string) {
   if (w.length > s.length - i) return false
   for (let j = 0; j < w.length; j++)
     if (s[i + j] != w[j]) return false
@@ -24,7 +24,11 @@ export class Syntax {
   static endarrow = Symbol("endarrow")
   static nakedfun = Symbol("naked-fun")
 
-  constructor(compiler) {
+  compiler: any
+  s: string
+  i: number
+
+  constructor(compiler: any) {
     this.compiler = compiler
     this.s = compiler.src
     this.i = 0
@@ -42,24 +46,24 @@ export class Syntax {
     return this.compiler.errorAt(this.i)
   }
   
-  peekWord(w) {
+  peekWord(w: string) {
     return isPrefix(this.s, this.i, w)
   }
   
-  tryWordNoWhitespace(w) {
+  tryWordNoWhitespace(w: string) {
     if (!this.peekWord(w)) return false
     this.i += w.length
     return true
   }
   
-  tryWord(w) {
+  tryWord(w: string) {
     let b = this.tryWordNoWhitespace(w)
     if (!b) return false
     this.tryWhitespace()
     return true
   }
   
-  assertWord(w) {
+  assertWord(w: string) {
     assertL(this.tryWord(w), () => `expected "${w}"` + this.errorAt()) 
   }
   
@@ -76,9 +80,11 @@ export class Syntax {
   tryComment() {
     while (true) {
     if (this.tryWord("#{")) {
-      while (this.notPastEof() && this.peekChar() !== '}')
-        if (!this.tryComment())
-          this.i++
+      while (this.notPastEof() && this.peekChar() !== '}') {
+        // todo: might be suboptimal
+        this.tryComment()
+        this.i++
+      }
       this.i++
     } else if (this.tryWord("#")) {
       while (this.notPastEof() && this.peekChar() !== '\n') this.i++
@@ -123,7 +129,7 @@ export class Syntax {
     return id
   }
   
-  stringLiteral(end) {
+  stringLiteral(end: string) {
     let s = ""
     while (!this.tryWordNoWhitespace(end))
       s += this.char()
@@ -131,7 +137,7 @@ export class Syntax {
     return s
   }
   
-  #normalize(es) {
+  #normalize(es: Generator<any, void, void>) {
     let ins = getOne(es)
     //write(ins)
     switch (ins.tag) {
@@ -173,7 +179,7 @@ export class Syntax {
     }
   }
   
-  idents(end) {
+  idents(end: string) {
     let ns = []
     while (!this.tryWord(end))
       ns.push(this.assertIdent())

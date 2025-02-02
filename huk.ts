@@ -1,9 +1,10 @@
-import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, mapInsert, step, nextLast, it, findUniqueIndex, map, filter, join, GeneratorFunction } from './util.js';
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap } from './util.ts'
 
-import { Syntax } from "./syntax.js"
-import { RootCodegen } from "./codegen.js"
+import { Syntax } from "./syntax.ts"
+import { RootCodegen } from "./codegen.ts"
+import { Compiler } from './compile.ts'
 
-function typeToString(ty) {
+function typeToString(ty: any) {
   switch (ty.tag) {
     case "any":
       return "any"
@@ -20,11 +21,11 @@ function typeToString(ty) {
   }
 }
 
-function mkUse(name) {
+function mkUse(name: string) {
   return {tag:"use",name}
 }
 
-function mkType(o) {
+function mkType(o: any) {
   Object.setPrototypeOf(o, {
     toString() {
       return typeToString(this)
@@ -34,8 +35,16 @@ function mkType(o) {
 }
 
 // The item typechecker, named after Yenisei
-class Huk {
-  constructor(root, item) {
+export class Huk {
+  c: Compiler
+  root: RootTyck
+  item: any
+  k: number
+  ctx: any[]
+  methodNameAt: ObjectMap<string>
+  funName: string
+
+  constructor(root: RootTyck, item: any) {
     this.c = root.c // compiler
     this.root = root // toplevel tycker
 
@@ -59,17 +68,17 @@ ins() {
 }
 
 // invent a name like hint but not present in "taken"
-static invent(hint, taken) {
+static invent(hint: string, taken: string[]) {
   while (taken.includes(hint)) {
     let [_, alpha, num] =
       hint.match(/(\D*)(\d*)/)
-    hint = alpha+(num-0+1)
+    hint = alpha+(parseInt(num,10)+1)
   }
   return hint
 }
 
 // normalization by jit compilation
-normalize(tyExpr) {
+normalize(tyExpr: any) {
   //this.c.log("normalize", tyExpr)
   this.root.normalCounter += 1
   // prepare environment (it will be passed in params)
@@ -91,7 +100,7 @@ normalize(tyExpr) {
 }
 
 // Replace universal variables with existentials
-instantiate(vars, ty) {
+instantiate(vars: string[], ty: any) {
   //this.c.log("inst", ty)
   // generate fresh evar names
   let mapp = Object.create(null)
@@ -106,7 +115,7 @@ instantiate(vars, ty) {
   return Huk.instantiate0(mapp, ty)
 }
 
-static instantiate0(varMap, ty) {
+static instantiate0(varMap: ObjectMap<string>, ty: any) {
   //this.c.log("instantiate0", varMap, ty)
   switch (ty.tag) {
   case "cons":
@@ -132,7 +141,7 @@ static instantiate0(varMap, ty) {
 }
   
 // bidir.pdf: [Г]A
-substitute(ty) {
+substitute(ty: any) {
   //this.c.log(typeToString(ty))
   switch (ty.tag) {
   case "any":
@@ -164,7 +173,7 @@ substitute(ty) {
   }
 }
 
-solveEvarTo(name, solution) {
+solveEvarTo(name: string, solution: any) {
   //this.c.log("solve evar", name, solution)
   assert(!this.ctx.some(
     x => x.tag === "esolve" && x.name === name),
@@ -177,7 +186,7 @@ solveEvarTo(name, solution) {
   //todo: occurs check
 }
 
-unify(ty1, ty2) {
+unify(ty1: any, ty2: any) {
   /*write("unify", typeToString(ty1),
     typeToString(ty2), this.ctx)*/
   if (ty1.tag === "euse" &&
@@ -199,7 +208,7 @@ unify(ty1, ty2) {
     case "use":
       assert(ty2.tag === "use" && ty1.name === ty2.name,
         `error: "${typeToString(ty1)}" is not a subtype of "${typeToString(ty2)}"` +
-        this.c.errorAt())
+        this.c.errorAt(0))
       break
     case "cons":
       assertEq(ty2.tag, "cons")
@@ -277,7 +286,7 @@ infer() {
       
       let par = fty.domain[i]
       let ins2 = this.ins()
-      assert(ins2.tag !== Syntax.endapp, () => "expected argument of type " +
+      assertL(ins2.tag !== Syntax.endapp, () => "expected argument of type " +
         typeToString(par) +
         this.c.errorAt(ins2.span))
       // simple application
@@ -314,7 +323,7 @@ infer() {
   }
 }
   
-check(ty) {
+check(ty: any) {
   let ins = this.nextIns()
   //this.c.log("check", ins, typeToString(ty))
   switch (ins.tag) {
@@ -429,7 +438,12 @@ tyck() {
 }
 
 export class RootTyck {
-  constructor(c) {
+  c: any
+  globals: ObjectMap<any>
+  fixtures: ObjectMap<any>
+  normalCounter: number
+
+  constructor(c: any) {
     this.c = c // compiler
     // types of global declarations
     this.globals = Object.create(null)
@@ -438,7 +452,7 @@ export class RootTyck {
     this.normalCounter = 0
   }
   
-  getItemTyck(item) {
+  getItemTyck(item: any) {
     return new Huk(this, item)
   }
 }

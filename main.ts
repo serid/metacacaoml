@@ -1,11 +1,10 @@
-import { write } from './util.js'
-import { Compiler } from './compile.js'
+import { Compiler } from './compile.ts'
 
 let t = performance.now()
 function tyckTest() {
 new Compiler(`
 fun foo(): String = ""
-@Fails(error: "A" is not a subtype of "B" at "")
+@Fails(error: "A" is not a subtype of "B" at "# MetaCaCaoML stdlib")
 fun f('A 'B x:A): B = x
 `, false).compile()
 }

@@ -1,8 +1,9 @@
-import { toString, dbg, error, assert, assertL, assertEq, write, fuel, nonExhaustiveMatch, mapGet, step, nextLast, findUniqueIndex, map, join } from './util.js';
+import { assertEq, nonExhaustiveMatch, mapGet, map, join, any } from './util.ts'
 
-import { Syntax } from "./syntax.js"
+import { Syntax } from "./syntax.ts"
+import { Compiler } from './compile.ts'
 
-function mangle(path) {
+function mangle(path: string) {
   // hazard: unicode!!
   // characters found using shapecatcher.com
   path = path.replaceAll("/", "ᐅ")
@@ -12,7 +13,14 @@ function mangle(path) {
 }
 
 class ItemCodegen {
-  constructor(root, item) {
+  c: Compiler
+  root: RootCodegen
+  item: any
+  k: number
+  nextVar: number
+  code: string
+  
+  constructor(root: RootCodegen, item: any) {
     this.c = root.c
     this.root = root // toplevel codegen
     this.item = item
@@ -28,7 +36,7 @@ class ItemCodegen {
     return this.item.arena[this.k++]
   }
   
-  pushCode(s) {
+  pushCode(s: string) {
     this.root.code += s
   }
   
@@ -36,13 +44,13 @@ class ItemCodegen {
     return "_" + this.nextVar++
   }
 
-  emitSsa(e) {
+  emitSsa(e: string) {
     let ix = this.alloc()
     this.pushCode(`  const ${ix} = ${e}\n`)
     return ix
   }
   
-expr() {
+expr(): string {
   let insLocation = this.k
   let ins = this.nextIns()
   switch (ins.tag) {
@@ -57,7 +65,7 @@ expr() {
       ? "fixtures."+name
       : name)
   case Syntax.app:
-    let ixs = []
+    let ixs: string[] = []
     // generate strict arguments
     while (true) {
     let ins2 = this.nextIns()
@@ -93,7 +101,7 @@ expr() {
   case Syntax.any:
     return `{tag:"any"}`
   case Syntax.arrow:
-    let domain = []
+    let domain: string[] = []
     while (this.ins().tag !== Syntax.endarrow)
       domain.push(this.expr())
     this.k++
@@ -112,7 +120,7 @@ codegen() {
   case Syntax.cls:
     let elimCode = ""
     let fullname = mangle(item.name+"/elim")
-    let ps = join(map(item.conss, x=>x.name))
+    let ps = join(map(item.conss, x=>any(x).name))
     elimCode += `function* ${fullname}(self, ${ps}) {\n  switch (self.tag) {\n`
     for (let c of item.conss) {
       let ps = c.fields.map(x=>x.name)
@@ -132,7 +140,7 @@ codegen() {
     this.pushCode(`  return ${retIx}\n})().next().value;\n`)
     break
   case Syntax.fun:
-    let bs = map(item.bs,x=>mangle(x.name))
+    let bs = map(item.bs,x=>mangle(any(x).name))
     this.pushCode(`function* ${mangle(this.c.itemTyck.funName)}(${join(bs)}) {\n`)
     let retIx2 = this.expr()
     
@@ -151,13 +159,17 @@ codegen() {
 }
 
 export class RootCodegen {
-  constructor(c, fixtureNames) {
+  c: any
+  code: string
+  fixtureNames: string[]
+  
+  constructor(c: any, fixtureNames: string[]) {
     this.c = c // compiler
     this.code = `"use strict";\n`
     this.fixtureNames = fixtureNames
   }
   
-  getItemCodegen(item) {
+  getItemCodegen(item: any) {
     return new ItemCodegen(this, item)
   }
 }
