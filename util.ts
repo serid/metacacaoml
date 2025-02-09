@@ -73,6 +73,14 @@ export function mapGet<A>(o: ObjectMap<A>, key: string | number) {
   return value
 }
 
+export function mapMap<A, B>(o: ObjectMap<A>, f: (_: A) => B) {
+  let out: ObjectMap<B> = Object.create(null)
+  for (let k in o) {
+    out[k] = f(o[k])
+  }
+  return out
+}
+
 
 // Synchronous queue that may request a new element through a generator
 export class Pakulikha<A> {

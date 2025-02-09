@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { RootCodegen } from "./codegen.ts"
@@ -20,6 +20,8 @@ function typeToString(ty: any) {
       nonExhaustiveMatch(ty.tag)
   }
 }
+
+const useType = {tag: "cons", name: "Type", args: []}
 
 function mkUse(name: string) {
   return {tag:"use",name}
@@ -83,14 +85,14 @@ normalize(tyExpr: any) {
   this.root.normalCounter += 1
   // prepare environment (it will be passed in params)
   let env = Object.create(null)
-  env.fixtures = this.root.fixtures
+  env.fixtures = mapMap(this.root.globals, ({value})=>value)
   for (let x of this.ctx) {
     if (x.tag === "uni")
       env[x.name] = {tag:"use",name:x.name}
   }
   let envv = Object.entries(env)
   
-  let fixtureNames = Object.keys(this.root.fixtures)
+  let fixtureNames = Object.keys(env.fixtures)
   let cg = new RootCodegen(this.c, fixtureNames)
   cg.getItemCodegen(tyExpr).codegen()
   let obj = cg.code
@@ -347,13 +349,18 @@ tyck() {
   let item = this.item
   switch (item.tag) {
   case Syntax.cls:
-    // add type constructor to fixtures
-    mapInsert(this.root.fixtures, item.name,
-      item.gs.length===0
+    // add type constructor to globals
+    mapInsert(this.root.globals, item.name, {
+      gs: item.gs,
+      ty: item.gs.length===0
+      ? useType
+      : {tag:"arrow", domain:item.gs.map(_=>useType), codomain:useType},
+      value: item.gs.length===0 // todo: use codegen to get the value
       ? {tag:"cons", name:item.name, args:[]}
       : function*(...xs){
         return {tag:"cons", name:item.name, args:xs}
-      })
+      }
+    })
     
     // add generics to ctx
     for (let name of item.gs)
@@ -369,8 +376,11 @@ tyck() {
       args:item.gs.map(mkUse)
     }
     for (let c of normalConss) {
-      mapInsert(this.root.globals, item.name+"/"+c.name, {gs: item.gs, ty: {tag: "arrow", domain: c.fields, codomain: self
-      }})
+      mapInsert(this.root.globals, item.name+"/"+c.name, {
+        gs: item.gs,
+        ty: {tag: "arrow", domain: c.fields, codomain: self},
+        value: null // todo
+      })
     }
     let ret = Huk.invent("R", item.gs)
     let domain0 = [self].concat(normalConss.map(c=>({tag: "arrow",
@@ -378,13 +388,20 @@ tyck() {
       codomain: mkUse(ret)
     })
     ))
-    mapInsert(this.root.globals, item.name+"/elim", {gs: item.gs.concat([ret]), ty: {tag: "arrow", domain: domain0, codomain: mkUse(ret)}})
+    mapInsert(this.root.globals, item.name+"/elim", {
+      gs: item.gs.concat([ret]),
+      ty: {tag: "arrow", domain: domain0, codomain: mkUse(ret)},
+      value: null // todo
+    })
     break
   case Syntax.let:
     let ty = this.normalize(item.retT)
     this.check(ty)
-    mapInsert(this.root.globals, item.name,
-    {gs: [], ty})
+    mapInsert(this.root.globals, item.name, {
+      gs: [],
+      ty,
+      value: null // todo
+    })
     break
   case Syntax.fun:
     //let beforeFun = performance.now()
@@ -410,8 +427,11 @@ tyck() {
     } else name = item.name
     this.funName = name
 
-    mapInsert(this.root.globals, name,
-    {gs: item.gs, ty: {tag: "arrow", domain, codomain}})
+    mapInsert(this.root.globals, name, {
+      gs: item.gs,
+      ty: {tag: "arrow", domain, codomain},
+      value: null // todo
+    })
 
     if (item.annots.length === 0)
       this.check(codomain)
@@ -439,16 +459,15 @@ tyck() {
 
 export class RootTyck {
   c: any
-  globals: ObjectMap<any>
-  fixtures: ObjectMap<any>
+  globals: ObjectMap<{gs: string[], ty: any, value: any}>
   normalCounter: number
 
   constructor(c: any) {
     this.c = c // compiler
-    // types of global declarations
+    // A fixture is a value or a function present at compilation time. C++ calls this constexpr and in Zig it's comptime
+    // types and fixture values of global declarations
+    // Map<string, {ty, value}>
     this.globals = Object.create(null)
-    // A container for functions and constants to be used during compile-time evaluation
-    this.fixtures = Object.create(null)
     this.normalCounter = 0
   }
   
