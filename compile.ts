@@ -1,4 +1,4 @@
-import { toString } from './util.ts'
+import { toString, write } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Huk, RootTyck } from "./huk.ts"
@@ -24,9 +24,8 @@ export class Compiler {
   }
   
   log(...xs: any[]) {
-    xs.forEach(x=>{
-      this.logs += toString(x) + " "
-    })
+    write(...xs)
+    for (let x of xs) this.logs += toString(x) + " "
     this.logs += "\n\n"
   }
   
@@ -38,7 +37,7 @@ export class Compiler {
     try {
       return this.analyze(new Syntax(this).syntax())
     } catch (e) {
-      console.log(this.logs)
+      //console.log(this.logs)
       throw e
     }
   }
