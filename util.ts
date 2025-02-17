@@ -15,8 +15,14 @@ export function assertL(b: boolean, le: () => string) {
 }
 
 export function assertEq(x: any, y: any) {
-  assertL(x === y, () => `found ${toString(x)}, expected ${toString(y)}`)
+  assertL(x === y, () => `found ${prettyPrint(x)}, expected ${prettyPrint(y)}`)
   return x
+}
+
+export function prettyPrint(o: any) {
+  if (typeof o === "string")
+    return '"' + o + '"'
+  return toString(o)
 }
 
 export function toString(o: any) {
@@ -26,19 +32,17 @@ export function toString(o: any) {
     return "undefined"
   if (Array.isArray(o)) {
     if (o.length === 0) return "[]"
-    let r = "[" + toString(o[0])
+    let r = "[" + prettyPrint(o[0])
     for (let i = 1; i < o.length; i++)
-      r += ", " + toString(o[i])
+      r += ", " + prettyPrint(o[i])
     return r + "]"
   }
-  if (typeof o === "string")
-    return '"' + o + '"'
   if (typeof o === "object") {
     let keys = [...Object.keys(o)]
     if (keys.length === 0) return "{}"
-    let r = `{ ${keys[0]}: ${toString(o[keys[0]])}`
+    let r = `{ ${keys[0]}: ${prettyPrint(o[keys[0]])}`
     for (let i = 1; i < keys.length; i++)
-      r += `, ${keys[i]}: ${toString(o[keys[i]])}`
+      r += `, ${keys[i]}: ${prettyPrint(o[keys[i]])}`
     return r + " }"
   }
   return o.toString()
@@ -54,7 +58,7 @@ export function dbg(o: any) {
 }
 
 export function nonExhaustiveMatch(o: any) {
-  error("unhandled branch: " + toString(o))
+  error("unhandled branch: " + prettyPrint(o))
 }
 
 
@@ -103,7 +107,7 @@ export class Pakulikha<A> {
 
 export function step<A>(g: Generator<A, void, any>, arg?: any) {
   let val = g.next(arg).value
-  assertL(val === undefined, () => "expected nothing, got " + toString(val))
+  assertL(val === undefined, () => "expected nothing, got " + prettyPrint(val))
 }
 
 export function nextLast<A, B>(g: Generator<A, B, any>, arg?: any) {
