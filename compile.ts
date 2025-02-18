@@ -20,7 +20,7 @@ export class Compiler {
     this.logs = ""
     this.tyck = new RootTyck(this)
     this.itemTyck = <Huk><unknown>null
-    this.cg = new RootCodegen(this, [])
+    this.cg = new RootCodegen(this)
   }
   
   log(...xs: any[]) {
@@ -47,7 +47,7 @@ export class Compiler {
       this.log("analyze", item)
       this.itemTyck = this.tyck.getItemTyck(item)
       this.itemTyck.tyck()
-      this.cg.getItemCodegen(item).codegen()
+      this.cg.code += this.cg.getItemCodegen(item, []).codegen()
     }
 
     console.log(`normalizations count: ` + this.tyck.normalCounter)

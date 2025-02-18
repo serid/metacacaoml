@@ -93,9 +93,8 @@ normalize(tyExpr: any) {
   let envv = Object.entries(env)
   
   let fixtureNames = Object.keys(env.fixtures)
-  let cg = new RootCodegen(this.c, fixtureNames)
-  cg.getItemCodegen(tyExpr).codegen()
-  let obj = cg.code
+  let obj = `"use strict";\n` +
+    this.c.cg.getItemCodegen(tyExpr, fixtureNames).codegen()
   //this.c.log("obj", env, obj)
   let g = new GeneratorFunction(...map(envv,x=>x[0]), obj)(...map(envv,x=>x[1]))
   return nextLast(g)

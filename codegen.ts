@@ -16,16 +16,19 @@ class ItemCodegen {
   c: Compiler
   root: RootCodegen
   item: any
+  fixtureNames: string[]
   k: number
   nextVar: number
   code: string
   
-  constructor(root: RootCodegen, item: any) {
+  constructor(root: RootCodegen, item: any, fixtureNames: string[]) {
     this.c = root.c
     this.root = root // toplevel codegen
     this.item = item
+    this.fixtureNames = fixtureNames
     this.k = 0
     this.nextVar = 0
+    this.code = ""
   }
   
   ins() {
@@ -37,7 +40,7 @@ class ItemCodegen {
   }
   
   pushCode(s: string) {
-    this.root.code += s
+    this.code += s
   }
   
   alloc() {
@@ -61,7 +64,7 @@ expr(): string {
   case Syntax.use:
     let name = ins.name
     return mangle(
-      this.root.fixtureNames.includes(name)
+      this.fixtureNames.includes(name)
       ? "fixtures."+name
       : name)
   case Syntax.app:
@@ -151,25 +154,24 @@ codegen() {
     break
   case Syntax.eof:
     this.pushCode(`main().next()`)
-    return this.code
+    break
   default:
     nonExhaustiveMatch(item.tag)
   }
+  return this.code
 }
 }
 
 export class RootCodegen {
   c: any
   code: string
-  fixtureNames: string[]
   
-  constructor(c: any, fixtureNames: string[]) {
+  constructor(c: any) {
     this.c = c // compiler
     this.code = `"use strict";\n`
-    this.fixtureNames = fixtureNames
   }
   
-  getItemCodegen(item: any) {
-    return new ItemCodegen(this, item)
+  getItemCodegen(item: any, fixtureNames: string[]) {
+    return new ItemCodegen(this, item, fixtureNames)
   }
 }
