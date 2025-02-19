@@ -111,19 +111,19 @@ export function step<A>(g: Generator<A, void, any>, arg?: any) {
 }
 
 export function nextLast<A, B>(g: Generator<A, B, any>, arg?: any) {
-  let { value, done } = g.next(arg)
-  assert(done!, "expected last")
-  return value
+  let iteratorResult = g.next(arg)
+  assert(iteratorResult.done, "expected last")
+  return <B>iteratorResult.value
 }
 
 export function getOne<A>(g: Generator<A, void, void>) {
   let { value } = g.next()
   assert(value !== undefined, "got undefined")
-  return value
+  return <A>value
 }
 export function getOneOrDef<A>(g: Generator<A, void, void>, d: A) {
   let { value } = g.next()
-  return value === undefined ? d : value
+  return value === undefined ? d : <A>value
 }
 
 
