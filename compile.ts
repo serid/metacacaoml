@@ -2,7 +2,8 @@ import { toString, write } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Huk, RootTyck } from "./huk.ts"
-import { RootCodegen } from "./codegen.ts"
+import { ItemCodegen, RootCodegen } from "./codegen.ts"
+import { Network } from './flow.ts'
 
 const std = await globalThis["Deno"].readTextFile("./memlstd.js")
 
@@ -13,6 +14,8 @@ export class Compiler {
   tyck: RootTyck
   itemTyck: Huk
   cg: RootCodegen
+  itemCg: ItemCodegen
+  itemNetwork: Network
 
   constructor(src: string, logging: boolean) {
     this.src = std + src
@@ -21,6 +24,16 @@ export class Compiler {
     this.tyck = new RootTyck(this)
     this.itemTyck = <Huk><unknown>null
     this.cg = new RootCodegen(this)
+    this.itemCg = <ItemCodegen><unknown>null
+    this.itemNetwork = new Network([
+      "fun-name",
+      "method-name-at",
+      "codegen-item",
+      "jit-compile",
+    ])
+
+    //this.tyck.initializeDucts(this.itemNetwork)
+    //this.cg.initializeDucts(this.itemNetwork)
   }
   
   log(...xs: any[]) {
@@ -46,8 +59,11 @@ export class Compiler {
     for (let item of items) {
       this.log("analyze", item)
       this.itemTyck = this.tyck.getItemTyck(item)
+      this.itemCg = this.cg.getItemCodegen(item, [])
       this.itemTyck.tyck()
-      this.cg.code += this.cg.getItemCodegen(item, []).codegen()
+      this.cg.code += this.itemCg.codegen()
+      
+      this.itemNetwork.resetCache()
     }
 
     console.log(`normalizations count: ` + this.tyck.normalCounter)

@@ -1,4 +1,4 @@
-import { assertEq, nonExhaustiveMatch, mapGet, map, join, any } from './util.ts'
+import { assertEq, nonExhaustiveMatch, map, join, any } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Compiler } from './compile.ts'
@@ -12,7 +12,7 @@ function mangle(path: string) {
   return path
 }
 
-class ItemCodegen {
+export class ItemCodegen {
   c: Compiler
   root: RootCodegen
   item: any
@@ -81,7 +81,7 @@ expr(): string {
     // For methods, fetch full name produced by tyck, otherwise the fun is first expression
     //write(ins)
     let fun = ins.metName !== null ?
-      mangle(mapGet(this.c.itemTyck.methodNameAt, insLocation)) :
+      mangle(this.c.itemTyck.getMethodNameAt(insLocation)) :
       ixs.shift()
     let retIx = this.emitSsa(`yield* ${fun}(${join(map(ixs,x=>x+","), " ")}`)
     
@@ -115,7 +115,7 @@ expr(): string {
   }
 }
   
-codegen() {
+codegen_() {
   let item = this.item
 
   //write("cg", ins)
@@ -160,6 +160,10 @@ codegen() {
   }
   return this.code
 }
+codegen() {
+  return this.c.itemNetwork.memoize(
+    "codegen-item", [], this.codegen_.bind(this))
+}
 }
 
 export class RootCodegen {
@@ -174,4 +178,12 @@ export class RootCodegen {
   getItemCodegen(item: any, fixtureNames: string[]) {
     return new ItemCodegen(this, item, fixtureNames)
   }
+
+  /*
+  initializeDucts(network: Network) {
+    network.register("codegen-type-constructor", () => {
+      error("")
+    })
+  }
+  */
 }
