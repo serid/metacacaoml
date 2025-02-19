@@ -52,6 +52,12 @@ export class ItemCodegen {
     this.pushCode(`  const ${ix} = ${e}\n`)
     return ix
   }
+
+emitYieldStar(what: string): string {
+  let yieldReturnVar = this.alloc()
+  this.pushCode(`  let ${yieldReturnVar}; while (true) { let pair = ${what}.next(); if (pair.done) { ${yieldReturnVar} = pair.value; break } yield pair.value }\n`)
+  return yieldReturnVar
+}
   
 expr(): string {
   let insLocation = this.k
@@ -83,7 +89,7 @@ expr(): string {
     let fun = ins.metName !== null ?
       mangle(this.c.itemTyck.getMethodNameAt(insLocation)) :
       ixs.shift()
-    let retIx = this.emitSsa(`yield* ${fun}(${join(map(ixs,x=>x+","), " ")}`)
+    let genIx = this.emitSsa(`${fun}(${join(map(ixs,x=>x+","), " ")}`)
     
     // generate trailing lambdas
     while (true) {
@@ -97,7 +103,7 @@ expr(): string {
     }
     
     this.pushCode("  );\n")
-    return retIx
+    return this.emitYieldStar(genIx)
     
   // types
   
@@ -131,6 +137,7 @@ codegen_() {
       let fullname = mangle(item.name+"/"+c.name)
       this.pushCode(`function* ${fullname}(${bs}) {\n  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`)
       let as = join(map(ps, x=>"self."+x))
+      //todo: eliminate yield*
       elimCode += `  case Symbol.for("${c.name}"): return yield* ${c.name}(${as});\n`
     }
     elimCode += `  default: throw new Error("nonexhaustive: " + self.tag.description)\n`

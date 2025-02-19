@@ -23,9 +23,21 @@ function *prompt/*<A, B>*/(comp/*: (...) -> Generator<(B -> A) -> Generator, A, 
 }
 
 // example function
-function *bar()
+function *bar() {}
 function *foo() {
     // call an effectful function, pass effects upwards, but print result
-    let res = yield* bar()
+    //desugared from: let res = yield* bar()
+    //because yield* obscures errors as
+    //"(immediate value)(immediate value) is not iterable"
+    let g = bar()
+    let res
+    while (true) {
+      let pair = g.next()
+      if (pair.done) {
+        res = pair.value
+        break
+      }
+      yield pair.value
+    }
     console.log(res)
 }
