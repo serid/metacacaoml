@@ -25,6 +25,13 @@ fun .div(x:Int y:Int): Int = native[|x/y|]
   
 class String end
 
+class Pair 'A 'B
+| New(A B)
+end
+
+let -check-tuple1: Pair(Int Pair(String Bool)) = (1 "" Bool/True())
+let -check-tuple2: Int = (((1)))
+
 class Box 'A
 | New(A)
 end

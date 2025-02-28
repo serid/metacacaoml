@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, fuel, nonExhaustiveMatch, getOne } from './util.ts'
+import { error, assert, assertL, assertEq, fuel, nonExhaustiveMatch, getOne, range, last, any } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
   if (w.length > s.length - i) return false
@@ -237,8 +237,22 @@ expr() {
     insQueue.push({tag:Syntax.endarray, span:this.i})
     this.tryWhitespace()
   } else if (this.tryWord("(")) {
-    insQueue = this.expr()
-    this.assertWord(")")
+    let subexprs = []
+    while (!this.tryWord(")"))
+      subexprs.push(this.expr())
+
+    // Elaborate (1) to 1
+    // Elaborate (1 2 3) to Pair(1 Pair(2 3))
+    for (let i of range(subexprs.length-1)) {
+      insQueue.push({tag:Syntax.app, span:subexprs[i][0].span, metName:null})
+      insQueue.push({tag:Syntax.use, span:subexprs[i][0].span,
+        name:"Pair/New"})
+      insQueue.push(...subexprs[i])
+    }
+    insQueue.push(...last(subexprs))
+    for (let _ of range(subexprs.length-1))
+      insQueue.push({tag:Syntax.endapp,
+        span:any(last(last(subexprs))).span})
   } else if (this.tryWord("@any")) {
     return [{tag:Syntax.any, span}]
   } else if (this.tryWord("[")) {
