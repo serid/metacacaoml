@@ -86,10 +86,9 @@ expr(): string {
     let ixs: string[] = []
     // generate strict arguments
     while (true) {
-    let ins2 = this.nextIns()
-    this.k--
-    if (ins2.tag === Syntax.endapp) break
-    if (ins2.tag === Syntax.applam) break
+    let ins = this.ins()
+    if (ins.tag === Syntax.endapp) break
+    if (ins.tag === Syntax.applam) break
     ixs.push(this.expr())
     }
     
@@ -98,15 +97,20 @@ expr(): string {
     let fun = ins.metName !== null ?
       mangle(this.c.itemTyck.getMethodNameAt(insLocation)) :
       ixs.shift()
+    
+    // A contrived codegen spell indeed
+    // Put no comas when no normal arguments are present
+    // Put a coma after each normal argument since they are followed
+    // by lambdas
     let genIx = this.emitSsa(`${fun}(${join(map(ixs,x=>x+","), " ")}`)
     
     // generate trailing lambdas
     while (true) {
-    let ins2 = this.nextIns()
-    if (ins2.tag === Syntax.endapp) break
-    assertEq(ins2.tag, Syntax.applam)
+    let ins = this.nextIns()
+    if (ins.tag === Syntax.endapp) break
+    assertEq(ins.tag, Syntax.applam)
     
-    this.pushCode(`  function*(${join(map(ins2.ps,mangle))}) {\n`)
+    this.pushCode(`  function*(${join(map(ins.ps,mangle))}) {\n`)
     let retIx = this.expr()
     this.pushCode(`  return ${retIx}\n  },\n`)
     }

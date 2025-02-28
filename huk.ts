@@ -326,20 +326,20 @@ infer() {
       //this.c.log("new fty", typeToString(fty), this.ctx)
       
       let par = fty.domain[i]
-      let ins2 = this.ins()
-      assertL(ins2.tag !== Syntax.endapp, () => "expected argument of type " +
+      let ins = this.ins()
+      assertL(ins.tag !== Syntax.endapp, () => "expected argument of type " +
         typeToString(par) +
-        this.c.errorAt(ins2.span))
+        this.c.errorAt(ins.span))
       // simple application
-      if (ins2.tag !== Syntax.applam) {
+      if (ins.tag !== Syntax.applam) {
         this.check(par)
         continue
       }
       this.k++
       // application of trailing lambda
       assertEq(par.tag, "arrow")
-      assertEq(par.domain.length, ins2.ps.length)
-      let ps = ins2.ps
+      assertEq(par.domain.length, ins.ps.length)
+      let ps = ins.ps
       for (var j = 0; j < par.domain.length; j++) {
         this.ctx.push({
           tag: "var",
@@ -389,7 +389,7 @@ check(ty: any) {
 tyck() {
   let item = this.item
   switch (item.tag) {
-  case Syntax.cls:
+  case Syntax.cls: {
     // add type constructor to globals
     mapInsert(this.root.globals, item.name, {
       gs: item.gs,
@@ -426,17 +426,18 @@ tyck() {
       })
     }
     let ret = Huk.invent("R", item.gs)
-    let domain0 = [self].concat(normalConss.map(c=>({tag: "arrow",
+    let domain = [self].concat(normalConss.map(c=>({tag: "arrow",
       domain: c.fields,
       codomain: mkUse(ret)
     })
     ))
     mapInsert(this.root.globals, item.name+"/elim", {
       gs: item.gs.concat([ret]),
-      ty: {tag: "arrow", domain: domain0, codomain: mkUse(ret)},
+      ty: {tag: "arrow", domain: domain, codomain: mkUse(ret)},
       value: null // todo
     })
     break
+  }
   case Syntax.let:
     let ty = this.normalize(item.retT)
     this.check(ty)
