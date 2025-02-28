@@ -60,12 +60,12 @@ export class Huk {
     this.funName = null
   }
 
-nextIns() {
-  return this.item.arena[this.k++]
-}
-
 ins() {
   return this.item.arena[this.k]
+}
+
+nextIns() {
+  return this.item.arena[this.k++]
 }
 
 // invent a name like hint but not present in "taken"
@@ -110,19 +110,36 @@ normalize(tyExpr: any) {
   return nextLast(g)
 }
 
+getTakenEVarNames(): string[] {
+  return [...map(filter(this.ctx, x=>
+    x.tag === "evar" || x.tag === "esolve"),
+    x=>x.name)]
+}
+
+allocEVar_(hint: string, taken: string[]) {
+  let name = Huk.invent(hint, taken)
+  this.ctx.push({tag:"evar", name})
+  return name
+}
+
+allocEVarMut(hint: string, taken: string[]) {
+  let name = this.allocEVar_(hint, taken)
+  taken.push(name)
+  return name
+}
+
+allocEVar(hint: string) {
+  return this.allocEVar_(hint, this.getTakenEVarNames())
+}
+
 // Replace universal variables with existentials
 instantiate(vars: string[], ty: any) {
   //this.c.log("inst", ty)
   // generate fresh evar names
   let mapp = Object.create(null)
-  for (let uniName of vars) {
-    let taken = [...map(filter(this.ctx, x=>
-      x.tag === "evar" || x.tag === "esolve"),
-      x=>x.name)]
-    let name = Huk.invent(uniName, taken)
-    mapp[uniName] = name
-    this.ctx.push({tag: "evar", name})
-  }
+  let taken = this.getTakenEVarNames()
+  for (let uniName of vars)
+    mapp[uniName] = this.allocEVarMut(uniName, taken)
   return Huk.instantiate0(mapp, ty)
 }
 
@@ -268,6 +285,17 @@ infer() {
     let gb = this.root.globals[ins.name]
     if (gb === undefined) error("var not found" + this.c.errorAt(ins.span))
     return this.instantiate(gb.gs, gb.ty)
+  case Syntax.array:
+    // if array is empty, element type is a fresh evar, otherwise infer
+    let elementTy = this.ins().tag===Syntax.endarray ?
+      {tag:"euse", name:this.allocEVar("Arr")} :
+      this.infer()
+
+    while (this.ins().tag!==Syntax.endarray)
+      this.check(elementTy)
+    this.k++
+
+    return {tag:"cons", name:"Array", args:[elementTy]}
   case Syntax.app:
     let isMethod = ins.metName !== null
     let fty
@@ -344,6 +372,7 @@ check(ty: any) {
     return
   case Syntax.strlit:
   case Syntax.int:
+  case Syntax.array:
   case Syntax.use:
   case Syntax.app:
     this.k--

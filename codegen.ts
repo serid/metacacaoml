@@ -75,6 +75,13 @@ expr(): string {
       this.fixtureNames.includes(name)
       ? "fixtures."+name
       : name)
+  case Syntax.array: {
+    let ixs: string[] = []
+    while (this.ins().tag!==Syntax.endarray)
+      ixs.push(this.expr())
+    this.k++
+    return this.emitSsa(`[${join(ixs)}]`)
+  }
   case Syntax.app:
     let ixs: string[] = []
     // generate strict arguments

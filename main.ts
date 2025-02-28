@@ -16,7 +16,7 @@ let src = `
 
 
 fun main(): Unit =
-  let(native[|[1, 2, 3]|]) λarray.
+  let(@[1 2 3]) λarray.
   let(write(array)) λ-.
   let(Array/to-iter(array)) λiterator.
   let(iterator.map(Int/increment)) λincremented.

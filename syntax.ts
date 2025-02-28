@@ -24,6 +24,8 @@ export class Syntax {
   static endarrow = Symbol("endarrow")
   static int = Symbol("int")
   static nakedfun = Symbol("naked-fun")
+  static array = Symbol("array")
+  static endarray = Symbol("endarray")
 
   compiler: any
   s: string
@@ -227,6 +229,12 @@ export class Syntax {
         n += parseInt(this.char())
       } while (this.notPastEof() && /[0-9]/.test(this.peekChar()))
       insQueue.push({tag: Syntax.int, span, data: n})
+      this.tryWhitespace()
+    } else if (this.tryWord("@[")) {
+      insQueue.push({tag:Syntax.array, span:this.i})
+      while (!this.tryWord("]"))
+        insQueue.push(...this.expr())
+      insQueue.push({tag:Syntax.endarray, span:this.i})
       this.tryWhitespace()
     } else if (this.tryWord("(")) {
       insQueue = this.expr()

@@ -45,7 +45,6 @@ let -check1: [Option(Int) []String [Int]String] String
   = Option/elim
 
 class Array 'A end
-fun new-array('A): Array(A) = native[|[]|]
 fun .length('A self:Array(A)): Int =
   native[|self.length|]
 fun .get('A self:Array(A) i:Int): A =
@@ -68,7 +67,7 @@ fun .for-each('A i:Iter(A) f:[A]Unit): Unit = Option/elim(i.unpack()())
   { . Unit/C() }
   { x. and(f(x) i.for-each(f)) }
 fun .to-array('A i:Iter(A)): Array(A) =
-  let(new-array()) λ xs.
+  let(@[]) λ xs.
   let(i.for-each() λ x.
     xs.push(x)
   ) λ -.
