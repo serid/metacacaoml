@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, range } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Compiler } from './compile.ts'
@@ -242,7 +242,7 @@ unify(ty1: any, ty2: any) {
       assertEq(ty2.tag, "cons")
       assertEq(ty1.name, ty2.name)
       assertEq(ty1.args.length, ty2.args.length)
-      for (var i = 0; i < ty1.args.length; i++) {
+      for (let i of range(ty1.args.length)) {
         this.unify(ty1.args[i], ty2.args[i])
         ty1 = this.substitute(ty1)
         ty2 = this.substitute(ty2)
@@ -251,7 +251,7 @@ unify(ty1: any, ty2: any) {
     case "arrow":
       assert(ty2.tag === "arrow")
       assert(ty1.domain.length === ty2.domain.length)
-      for (var i = 0; i < ty1.domain.length; i++) {
+      for (let i of range(ty1.domain.length)) {
         this.unify(ty1.domain[i], ty2.domain[i])
         ty1 = this.substitute(ty1)
         ty2 = this.substitute(ty2)
@@ -318,7 +318,7 @@ infer() {
     //this.c.log("fty", typeToString(fty))
     assertEq(fty.tag, "arrow") //todo evar
     
-    for (let i = isMethod?1:0; i < fty.domain.length; i++) {
+    for (let i of range(isMethod?1:0, fty.domain.length)) {
       // mutate the type as we iterate through it, yuppie!!! 
       // this is necessary since context grows in information as we check arguments
       // todo: performance: only substitute remaining arguments
@@ -340,7 +340,7 @@ infer() {
       assertEq(par.tag, "arrow")
       assertEq(par.domain.length, ins.ps.length)
       let ps = ins.ps
-      for (var j = 0; j < par.domain.length; j++) {
+      for (let j of range(par.domain.length)) {
         this.ctx.push({
           tag: "var",
           name: ps[j],

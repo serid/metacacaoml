@@ -19,6 +19,15 @@ export function assertEq(x: any, y: any) {
   return x
 }
 
+export function* range(a: number, b?: number, step: number = 1) {
+  if (b===undefined) {
+    b = a
+    a = 0
+  }
+  for (let i = a; i < b; i += step)
+    yield i
+}
+
 export function prettyPrint(o: any) {
   if (typeof o === "string")
     return '"' + o + '"'
@@ -33,7 +42,7 @@ export function toString(o: any) {
   if (Array.isArray(o)) {
     if (o.length === 0) return "[]"
     let r = "[" + prettyPrint(o[0])
-    for (let i = 1; i < o.length; i++)
+    for (let i of range(1, o.length))
       r += ", " + prettyPrint(o[i])
     return r + "]"
   }
@@ -41,7 +50,7 @@ export function toString(o: any) {
     let keys = [...Object.keys(o)]
     if (keys.length === 0) return "{}"
     let r = `{ ${keys[0]}: ${prettyPrint(o[keys[0]])}`
-    for (let i = 1; i < keys.length; i++)
+    for (let i of range(1, keys.length))
       r += `, ${keys[i]}: ${prettyPrint(o[keys[i]])}`
     return r + " }"
   }
@@ -144,14 +153,14 @@ export function it(xs: any): Generator<any, void, any> {
 
 export function findUniqueIndex<A>(xs: A[], f: (_: A) => boolean) {
   let ri = -1
-  for (var i = 0; i < xs.length; i++)
+  for (let i of range(xs.length))
     if (f(xs[i])) {
       ri = i
       break
     }
   if (ri === -1)
     return ri
-  for (var i = ri + 1; i < xs.length; i++)
+  for (let i of range(ri + 1, xs.length))
     if (f(xs[i])) error("not unique")
   return ri
 }
