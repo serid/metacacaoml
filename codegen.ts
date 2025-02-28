@@ -67,6 +67,8 @@ expr(): string {
     return `"${ins.data}"`
   case Syntax.native:
     return ins.code
+  case Syntax.int:
+    return `${ins.data}`
   case Syntax.use:
     let name = ins.name
     return mangle(

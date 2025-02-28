@@ -22,6 +22,7 @@ export class Syntax {
   static arrow = Symbol("arrow")
   static any = Symbol("any")
   static endarrow = Symbol("endarrow")
+  static int = Symbol("int")
   static nakedfun = Symbol("naked-fun")
 
   compiler: any
@@ -219,6 +220,14 @@ export class Syntax {
       insQueue.push({tag: Syntax.strlit, span, data: this.stringLiteral('"')})
     } else if (this.tryWord("native[|")) {
       insQueue.push({tag: Syntax.native, span, code: this.stringLiteral("|]")})
+    } else if (/[0-9]/.test(this.peekChar())) {
+      let n = 0
+      do {
+        n *= 10
+        n += parseInt(this.char())
+      } while (this.notPastEof() && /[0-9]/.test(this.peekChar()))
+      insQueue.push({tag: Syntax.int, span, data: n})
+      this.tryWhitespace()
     } else if (this.tryWord("(")) {
       insQueue = this.expr()
       this.assertWord(")")

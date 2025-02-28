@@ -255,6 +255,8 @@ infer() {
     return {tag:"cons", name:"String", args:[]}
   case Syntax.native:
     return {tag: "any"}
+  case Syntax.int:
+    return {tag:"cons", name:"Int", args:[]}
   case Syntax.use:
     // try finding a local
     let ix = this.ctx.findLastIndex(x=>
@@ -341,6 +343,7 @@ check(ty: any) {
   case Syntax.native:
     return
   case Syntax.strlit:
+  case Syntax.int:
   case Syntax.use:
   case Syntax.app:
     this.k--

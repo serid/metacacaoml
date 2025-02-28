@@ -15,10 +15,13 @@ fun bool-from-native(b:@any): Bool =
   native[|b?yield*BoolᐅTrue():yield*BoolᐅFalse()|]
 
 class Int end
-let zero: Int = native[|0|]
 fun .increment(x:Int): Int = native[|x+1|]
-fun .lt(x:Int y:Int): Bool =
-  bool-from-native(native[|x<y|])
+fun .lt(x:Int y:Int): Bool = bool-from-native(native[|x<y|])
+fun .eq(x:Int y:Int): Bool = bool-from-native(native[|x===y|])
+fun .add(x:Int y:Int): Int = native[|x+y|]
+fun .sub(x:Int y:Int): Int = native[|x-y|]
+fun .mul(x:Int y:Int): Int = native[|x*y|]
+fun .div(x:Int y:Int): Int = native[|x/y|]
   
 class String end
 
@@ -71,7 +74,7 @@ fun .to-array('A i:Iter(A)): Array(A) =
   ) λ -.
   xs
 fun .to-iter('A xs:Array(A)): Iter(A) =
-  let(Box/New(zero)) λ i.
+  let(Box/New(0)) λ i.
   Iter/New() λ .
   let(i.get()) λ iv.
   Bool/elim(iv.lt(xs.length()))
