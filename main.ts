@@ -14,6 +14,7 @@ tyckTest()
 let src = `
 # What follows is a GSLR(1) parser generation library for Meml
 
+let x: id(Int) = 1
 
 fun main(): Unit =
   let(@[1 2 3]) λarray.

@@ -1,9 +1,10 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Compiler } from './compile.ts'
 
 function typeToString(ty: any) {
+  if (ty===undefined||ty===null) return String(ty)
   switch (ty.tag) {
     case "any":
       return "any"
@@ -95,19 +96,24 @@ normalize(tyExpr: any) {
   this.root.normalCounter += 1
   // prepare environment (it will be passed in params)
   let env = Object.create(null)
-  env.fixtures = mapMap(this.root.globals, ({value})=>value)
+  env.fixtures = mapMap(this.root.globals, ({value})=>value===null?null:value.get())
   for (let x of this.ctx) {
     if (x.tag === "uni")
       env[x.name] = {tag:"use",name:x.name}
   }
   let envv = Object.entries(env)
+  let paramNames = envv.map(x=>x[0])
   
   let fixtureNames = Object.keys(env.fixtures)
   let obj = `"use strict";\n` +
     this.c.cg.getItemCodegen(tyExpr, fixtureNames).codegen_()
-  //this.c.log("obj", env, obj)
-  let g = new GeneratorFunction(...map(envv,x=>x[0]), obj)(...map(envv,x=>x[1]))
-  return nextLast(g)
+  
+  this.c.log("env:", env)
+  this.c.log(`obj: function*(${join(paramNames)}) {\n${obj}\n}`)
+  let g = new GeneratorFunction(...paramNames, obj)(...map(envv,x=>x[1]))
+  let normalized = nextLast(g)
+  this.c.log("normalized:", normalized)
+  return normalized
 }
 
 getTakenEVarNames(): string[] {
@@ -398,11 +404,11 @@ tyck() {
       : {tag:"arrow", domain:item.gs.map(_=>useType), codomain:useType},
       // todo: use codegen to get the value.. except types are not present
       // at runtime and are thus not codegened (?)
-      value: item.gs.length===0
+      value: new LateInit(item.gs.length===0
       ? {tag:"cons", name:item.name, args:[]}
       : function*(...xs){
         return {tag:"cons", name:item.name, args:xs}
-      }
+      })
     })
     
     // add generics to ctx
@@ -474,7 +480,7 @@ tyck() {
     mapInsert(this.root.globals, name, {
       gs: item.gs,
       ty: {tag: "arrow", domain, codomain},
-      value: null // todo
+      value: new LateInit() // todo
     })
 
     if (item.annots.length === 0)
@@ -490,9 +496,9 @@ tyck() {
     }
 
     // fill-in the fixture
-    /*mapGet(this.root.globals, name).value.set(
-      new GeneratorFunction(this.c.itemCg.codegen())()
-    )*/
+    mapGet(this.root.globals, name).value.set(
+      new GeneratorFunction(this.c.itemCg.codegen())
+    )
 
     // check if all evars are solved? no
     //assert(this.ctx.)
@@ -508,7 +514,7 @@ tyck() {
 
 export class RootTyck {
   c: any
-  globals: ObjectMap<{gs: string[], ty: any, value: any}>
+  globals: ObjectMap<{gs: string[], ty: any, value: LateInit<any>}>
   normalCounter: number
 
   constructor(c: any) {

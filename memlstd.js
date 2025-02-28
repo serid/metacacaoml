@@ -85,3 +85,11 @@ fun .map('A 'B i:Iter(A) f:[A]B): Iter(B) =
   Option/elim(i.unpack()())
   { . Option/None() }
   { x. Option/Some(f(x)) }
+
+
+
+fun .shallowCopy('A xs:Array(A)): Array(A) =
+  native[|[...xs]|]
+
+fun .sort('A xs:Array(A) cmp:[A A]Int): Array(A) =
+  native[|[...xs].sort(cmp)|]
