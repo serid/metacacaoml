@@ -3,7 +3,7 @@ import { assertEq, nonExhaustiveMatch, map, join, any } from './util.ts'
 import { Syntax } from "./syntax.ts"
 import { Compiler } from './compile.ts'
 
-function mangle(path: string) {
+export function mangle(path: string) {
   // hazard: unicode!!
   // characters found using shapecatcher.com
   path = path.replaceAll("/", "ᐅ")

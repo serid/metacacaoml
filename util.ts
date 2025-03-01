@@ -192,6 +192,29 @@ export function* bind(i: any, k: any) {
     for (let y of k(x)) yield y
 }
 
+export class LateInit<T> {
+  value: T | null
+
+  constructor(value?: T) {
+    if (value === undefined)
+      this.value = null
+    else
+      this.value = value
+  }
+
+  get(): T {
+    if (this.value === null)
+      error("value not set yet")
+    return this.value
+  }
+
+  set(value: T) {
+    if (this.value !== null)
+      error("value already set")
+    this.value = value
+  }
+}
+
 class Fuel {
   x: number
 

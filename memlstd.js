@@ -52,12 +52,16 @@ let -check1: [Option(Int) []String [Int]String] String
   = Option/elim
 
 class Array 'A end
-fun .length('A self:Array(A)): Int =
-  native[|self.length|]
-fun .get('A self:Array(A) i:Int): A =
-  native[|self[i]|]
-fun .push('A self:Array(A) x:A): Unit =
-  anyways(native[|self.push(x)|])
+fun .length('A xs:Array(A)): Int =
+  native[|xs.length|]
+fun .get('A xs:Array(A) i:Int): A =
+  native[|xs[i]|]
+fun .push('A xs:Array(A) x:A): Unit =
+  anyways(native[|xs.push(x)|])
+fun .shallow-copy('A xs:Array(A)): Array(A) =
+  native[|[...xs]|]
+fun .sort('A xs:Array(A) cmp:[A A]Int): Array(A) =
+  native[|[...xs].sort(cmp)|]
 
 # [A]B is a type of functions from A to B.
 # Function calls are parenthesised.
@@ -92,3 +96,7 @@ fun .map('A 'B i:Iter(A) f:[A]B): Iter(B) =
   Option/elim(i.unpack()())
   { . Option/None() }
   { x. Option/Some(f(x)) }
+
+
+
+let -check-id: id(Int) = 1
