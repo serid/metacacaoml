@@ -5,7 +5,7 @@ import { Huk, RootTyck } from "./huk.ts"
 import { ItemCodegen, RootCodegen } from "./codegen.ts"
 import { Network } from './flow.ts'
 
-const std = await globalThis["Deno"].readTextFile("./memlstd.js")
+const std = await globalThis.Deno.readTextFile("./memlstd.rs")
 
 export class Compiler {
   src: string
