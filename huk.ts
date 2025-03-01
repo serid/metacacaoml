@@ -96,9 +96,10 @@ normalize(tyExpr: any) {
   //this.c.log("normalize", tyExpr)
   this.root.normalCounter++
   // prepare environment (it will be passed in params)
-  let env = Object.create(null)
-  env.fixtures = mapMap(this.root.globals,
+  let fixtures = mapMap(this.root.globals,
     ({value})=>value===null?null:value.get())
+  let env = Object.create(null)
+  env.__fixtures__ = fixtures
   for (let x of this.ctx) {
     if (x.tag === "uni")
       env[x.name] = {tag:"use",name:x.name}
@@ -107,9 +108,8 @@ normalize(tyExpr: any) {
   let paramNames = envv.map(x=>x[0])
   let args = envv.map(x=>x[1])
   
-  let fixtureNames = Object.keys(env.fixtures)
   let obj = `"use strict";\n` +
-    this.c.cg.getItemCodegen(tyExpr, fixtureNames).codegen_()
+    this.c.cg.getItemCodegen(tyExpr, fixtures).codegen_()
   
   //this.c.log("env:", env)
   //this.c.log(`obj: function*(${join(paramNames)}) {\n${obj}\n}`)

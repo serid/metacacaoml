@@ -94,6 +94,11 @@ export function mapMap<A, B>(o: ObjectMap<A>, f: (_: A) => B) {
   return out
 }
 
+export interface ObjectSet{ [k: string]: any | undefined }
+
+export function setContains(o: ObjectSet, key: string) {
+  return o[key] !== undefined
+}
 
 // Synchronous queue that may request a new element through a generator
 export class Pakulikha<A> {

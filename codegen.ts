@@ -1,4 +1,4 @@
-import { assertEq, nonExhaustiveMatch, map, join, any } from './util.ts'
+import { assertEq, nonExhaustiveMatch, map, join, any, ObjectSet, setContains } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Compiler } from './compile.ts'
@@ -16,12 +16,12 @@ export class ItemCodegen {
   c: Compiler
   root: RootCodegen
   item: any
-  fixtureNames: string[]
+  fixtureNames: ObjectSet
   k: number
   nextVar: number
   code: string
   
-  constructor(root: RootCodegen, item: any, fixtureNames: string[]) {
+  constructor(root: RootCodegen, item: any, fixtureNames: ObjectSet) {
     this.c = root.c
     this.root = root // toplevel codegen
     this.item = item
@@ -72,8 +72,8 @@ expr(): string {
   case Syntax.use:
     let name = ins.name
     return mangle(
-      this.fixtureNames.includes(name)
-      ? "fixtures."+name
+      setContains(this.fixtureNames, name)
+      ? "__fixtures__."+name
       : name)
   case Syntax.array: {
     let ixs: string[] = []
@@ -195,7 +195,7 @@ export class RootCodegen {
     this.code = `"use strict";\n`
   }
   
-  getItemCodegen(item: any, fixtureNames: string[]) {
+  getItemCodegen(item: any, fixtureNames: ObjectSet) {
     return new ItemCodegen(this, item, fixtureNames)
   }
 
