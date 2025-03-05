@@ -62,11 +62,11 @@ export class Huk {
     this.funName = null
   }
 
-ins() {
+nextIns() {
   return this.item.arena[this.k]
 }
 
-nextIns() {
+stepIns() {
   return this.item.arena[this.k++]
 }
 
@@ -192,7 +192,7 @@ substitute(ty: any) {
     if (ix === -1)
       ix = findUniqueIndex(this.ctx, x=>
         x.tag === "evar" && x.name === ty.name)
-    assertL(ix !== -1, () => "evar not found" + this.c.errorAt(this.ins().span)) // invariant
+    assertL(ix !== -1, () => "evar not found" + this.c.errorAt(this.nextIns().span)) // invariant
     return this.ctx[ix].solution !== undefined ? this.ctx[ix].solution :
       ty
   case "cons":
@@ -274,7 +274,7 @@ unify(ty1: any, ty2: any) {
   
 infer() {
   let insLocation = this.k
-  let ins = this.nextIns()
+  let ins = this.stepIns()
   //this.c.log("infer", ins, this.ctx)
   switch (ins.tag) {
   case Syntax.strlit:
@@ -296,11 +296,11 @@ infer() {
     return this.instantiate(gb.gs, gb.ty)
   case Syntax.array:
     // if array is empty, element type is a fresh evar, otherwise infer
-    let elementTy = this.ins().tag===Syntax.endarray ?
+    let elementTy = this.nextIns().tag===Syntax.endarray ?
       {tag:"euse", name:this.allocEVar("Arr")} :
       this.infer()
 
-    while (this.ins().tag!==Syntax.endarray)
+    while (this.nextIns().tag!==Syntax.endarray)
       this.check(elementTy)
     this.k++
 
@@ -335,7 +335,7 @@ infer() {
       //this.c.log("new fty", typeToString(fty), this.ctx)
       
       let par = fty.domain[i]
-      let ins = this.ins()
+      let ins = this.nextIns()
       assertL(ins.tag !== Syntax.endapp, () => "expected argument of type " +
         typeToString(par) +
         this.c.errorAt(ins.span))
@@ -366,7 +366,7 @@ infer() {
       }
     }
 
-    assertEq(this.nextIns().tag, Syntax.endapp) // invariant
+    assertEq(this.stepIns().tag, Syntax.endapp) // invariant
     return this.substitute(fty.codomain)
   default:
     nonExhaustiveMatch(ins.tag)
@@ -374,7 +374,7 @@ infer() {
 }
   
 check(ty: any) {
-  let ins = this.nextIns()
+  let ins = this.stepIns()
   //this.c.log("check", ins, typeToString(ty))
   switch (ins.tag) {
   case Syntax.native:

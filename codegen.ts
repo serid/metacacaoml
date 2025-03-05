@@ -17,7 +17,7 @@ export class ItemCodegen {
   root: RootCodegen
   item: any
   fixtureNames: ObjectSet
-  k: number
+  k: number // points one past the current instruction
   nextVar: number
   code: string
   
@@ -31,11 +31,11 @@ export class ItemCodegen {
     this.code = ""
   }
   
-  ins() {
+  nextIns() {
     return this.item.arena[this.k]
   }
 
-  nextIns() {
+  stepIns() {
     return this.item.arena[this.k++]
   }
   
@@ -61,7 +61,7 @@ emitYieldStar(what: string): string {
   
 expr(): string {
   let insLocation = this.k
-  let ins = this.nextIns()
+  let ins = this.stepIns()
   switch (ins.tag) {
   case Syntax.strlit:
     return `"${ins.data}"`
@@ -77,7 +77,7 @@ expr(): string {
       : name)
   case Syntax.array: {
     let ixs: string[] = []
-    while (this.ins().tag!==Syntax.endarray)
+    while (this.nextIns().tag!==Syntax.endarray)
       ixs.push(this.expr())
     this.k++
     return this.emitSsa(`[${join(ixs)}]`)
@@ -85,12 +85,8 @@ expr(): string {
   case Syntax.app:
     let ixs: string[] = []
     // generate strict arguments
-    while (true) {
-    let ins = this.ins()
-    if (ins.tag === Syntax.endapp) break
-    if (ins.tag === Syntax.applam) break
-    ixs.push(this.expr())
-    }
+    while (![Syntax.endapp, Syntax.applam].includes(this.nextIns().tag))
+      ixs.push(this.expr())
     
     // For methods, fetch full name produced by tyck, otherwise the fun is first expression
     //write(ins)
@@ -99,14 +95,14 @@ expr(): string {
       ixs.shift()
     
     // A contrived codegen spell indeed
-    // Put no comas when no normal arguments are present
-    // Put a coma after each normal argument since they are followed
+    // Put no commas when no normal arguments are present
+    // Put a comma after each normal argument since they are followed
     // by lambdas
     let genIx = this.emitSsa(`${fun}(${join(map(ixs,x=>x+","), " ")}`)
     
     // generate trailing lambdas
     while (true) {
-    let ins = this.nextIns()
+    let ins = this.stepIns()
     if (ins.tag === Syntax.endapp) break
     assertEq(ins.tag, Syntax.applam)
     
@@ -124,7 +120,7 @@ expr(): string {
     return `{tag:"any"}`
   case Syntax.arrow:
     let domain: string[] = []
-    while (this.ins().tag !== Syntax.endarrow)
+    while (this.nextIns().tag !== Syntax.endarrow)
       domain.push(this.expr())
     this.k++
     let codomain = this.expr()
