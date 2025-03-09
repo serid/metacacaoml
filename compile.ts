@@ -10,7 +10,7 @@ const std = await globalThis.Deno.readTextFile("./memlstd.rs")
 export class Compiler {
   src: string
   logging: boolean
-  logs: string
+  logs: string[]
   tyck: RootTyck
   itemTyck: Huk
   cg: RootCodegen
@@ -20,7 +20,7 @@ export class Compiler {
   constructor(src: string, logging: boolean) {
     this.src = std + src
     this.logging = logging
-    this.logs = ""
+    this.logs = []
     this.tyck = new RootTyck(this)
     this.itemTyck = <Huk><unknown>null
     this.cg = new RootCodegen(this)
@@ -38,8 +38,8 @@ export class Compiler {
   
   log(...xs: any[]) {
     write(...xs)
-    for (let x of xs) this.logs += toString(x) + " "
-    this.logs += "\n\n"
+    for (let x of xs) this.logs.push(toString(x), " ")
+    this.logs.push("\n\n")
   }
   
   errorAt(span: number) {
@@ -61,12 +61,12 @@ export class Compiler {
       this.itemTyck = this.tyck.getItemTyck(item)
       this.itemCg = this.cg.getItemCodegen(item, [])
       this.itemTyck.tyck()
-      this.cg.code += this.itemCg.codegen()
+      this.cg.code.push(this.itemCg.codegen())
       
       this.itemNetwork.resetCache()
     }
 
     console.log(`normalizations count: ` + this.tyck.normalCounter)
-    return this.cg.code
+    return this.cg.getCode()
   }
 }
