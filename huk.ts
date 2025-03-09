@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Compiler } from './compile.ts'
@@ -14,9 +14,9 @@ function showType(ty: any) {
     case "euse":
       return "?" + ty.name
     case "cons":
-      return `${ty.name}(${join(map(ty.args, showType), " ")})`
+      return `${ty.name}(${ty.args.map(showType).join(" ")})`
     case "arrow":
-      return `[${join(map(ty.domain, showType), " ")}]` + showType(ty.codomain)
+      return `[${ty.domain.map(showType).join(" ")}]` + showType(ty.codomain)
     default:
       nonExhaustiveMatch(ty.tag)
   }

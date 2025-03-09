@@ -3,7 +3,7 @@
 import { join, mapGet, ObjectMap, write } from "./util.ts"
 
 function argsToString(args: string[]) {
-  return join(args, ":")
+  return args.join(":")
 }
 
 export class Network {

@@ -1,4 +1,4 @@
-import { assertEq, nonExhaustiveMatch, map, join, any, ObjectSet, setContains } from './util.ts'
+import { assertEq, nonExhaustiveMatch, join, any, ObjectSet, setContains } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Compiler } from './compile.ts'
@@ -98,7 +98,7 @@ expr(): string {
     // Put no commas when no normal arguments are present
     // Put a comma after each normal argument since they are followed
     // by lambdas
-    let genIx = this.emitSsa(`${fun}(${join(map(ixs,x=>x+","), " ")}`)
+    let genIx = this.emitSsa(`${fun}(${ixs.map(x=>x+",").join(" ")}`)
     
     // generate trailing lambdas
     while (true) {
@@ -106,7 +106,7 @@ expr(): string {
     if (ins.tag === Syntax.endapp) break
     assertEq(ins.tag, Syntax.applam)
     
-    this.pushCode(`  function*(${join(map(ins.ps,mangle))}) {\n`)
+    this.pushCode(`  function*(${join(ins.ps.map(mangle))}) {\n`)
     let retIx = this.expr()
     this.pushCode(`  return ${retIx}\n  },\n`)
     }
@@ -138,14 +138,14 @@ codegen_() {
   case Syntax.cls:
     let elimCode = ""
     let fullname = mangle(item.name+"/elim")
-    let ps = join(map(item.conss, x=>any(x).name))
+    let ps = join(item.conss.map(x=>x.name))
     elimCode += `function* ${fullname}(self, ${ps}) {\n  switch (self.tag) {\n`
     for (let c of item.conss) {
       let ps = c.fields.map(x=>x.name)
       let bs = join(ps)
       let fullname = mangle(item.name+"/"+c.name)
       this.pushCode(`function* ${fullname}(${bs}) {\n  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`)
-      let as = join(map(ps, x=>"self."+x))
+      let as = join(ps.map(x=>"self."+x))
       //todo: eliminate yield*
       elimCode += `  case Symbol.for("${c.name}"): return yield* ${c.name}(${as});\n`
     }
@@ -159,7 +159,7 @@ codegen_() {
     this.pushCode(`  return ${retIx}\n})().next().value;\n`)
     break
   case Syntax.fun:
-    let bs = map(item.bs,x=>mangle(any(x).name))
+    let bs = item.bs.map(x=>mangle(any(x).name))
     this.pushCode(`function* ${mangle(this.c.itemTyck.funName)}(${join(bs)}) {\n`)
     let retIx2 = this.expr()
     

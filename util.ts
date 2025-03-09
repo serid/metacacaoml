@@ -58,7 +58,7 @@ export function toString(o: any) {
 }
 
 export function write(...os: any[]) {
-  console.log(join(map(os, toString), " "))
+  console.log(os.map(toString).join(" "))
 }
 
 export function dbg(o: any) {
@@ -184,9 +184,18 @@ export function foldl<A, B>(i: Iterable<B>, s: A, c: (_: A, _0: B) => A) {
 }
 
 export function join(i: Iterable<string>, sep=", "): string {
+  let a = Array.isArray(i) ? i : [...i]
+  return a.join(sep)
+}
+
+/*
+// join implementation biased for stream processing.
+// avoids allocating an intermediate array
+export function join(i: Iterable<string>, sep=", "): string {
   let g = it(i)
   return foldl(g, getOneOrDef(g, ""), (s, x) => s + sep + x)
 }
+*/
 
 export function forEach<A>(i: Iterable<A>, f: (_: A) => void) {
   for (let x of i) f(x)
