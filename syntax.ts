@@ -231,35 +231,44 @@ expr() {
     insQueue.push({tag: Syntax.int, span, data: n})
     this.tryWhitespace()
   } else if (this.tryWord("@[")) {
-    insQueue.push({tag:Syntax.array, span:this.i})
-    while (!this.tryWord("]"))
+    insQueue.push({tag:Syntax.array, span})
+    span = this.i
+    while (!this.tryWord("]")) {
       insQueue.push(...this.expr())
-    insQueue.push({tag:Syntax.endarray, span:this.i})
+      span = this.i
+    }
+    insQueue.push({tag:Syntax.endarray, span})
     this.tryWhitespace()
   } else if (this.tryWord("(")) {
+    span = this.i
     let subexprs = []
-    while (!this.tryWord(")"))
+    while (!this.tryWord(")")) {
       subexprs.push(this.expr())
+      span = this.i
+    }
 
     // Elaborate (1) to 1
     // Elaborate (1 2 3) to Pair(1 Pair(2 3))
     for (let i of range(subexprs.length-1)) {
-      insQueue.push({tag:Syntax.app, span:subexprs[i][0].span, metName:null})
-      insQueue.push({tag:Syntax.use, span:subexprs[i][0].span,
+      insQueue.push({tag:Syntax.app, span, metName:null})
+      insQueue.push({tag:Syntax.use, span,
         name:"Pair/New"})
       insQueue.push(...subexprs[i])
     }
     insQueue.push(...last(subexprs))
     for (let _ of range(subexprs.length-1))
       insQueue.push({tag:Syntax.endapp,
-        span:any(last(last(subexprs))).span})
+        span})
   } else if (this.tryWord("@any")) {
     return [{tag:Syntax.any, span}]
   } else if (this.tryWord("[")) {
-    insQueue.push({tag:Syntax.arrow, span:this.i})
-    while (!this.tryWord("]"))
+    insQueue.push({tag:Syntax.arrow, span})
+    span = this.i
+    while (!this.tryWord("]")) {
       insQueue.push(...this.expr())
-    insQueue.push({tag:Syntax.endarrow, span:this.i})
+      span = this.i
+    }
+    insQueue.push({tag:Syntax.endarrow, span})
     insQueue.push(...this.expr())
     return insQueue
   } else {
@@ -278,26 +287,31 @@ expr() {
     
   if (this.tryWord("(")) {
     insQueue.unshift({tag: Syntax.app, span, metName})
-    while (!this.tryWord(")"))
+    span = this.i
+    while (!this.tryWord(")")) {
       insQueue.push(...this.expr())
-    while (true) {
       span = this.i
+    }
+    while (true) {
+      let span2 = this.i
       if (this.tryWord("λ")) {
         let ps = this.idents(".")
-        insQueue.push({tag: Syntax.applam, span, ps})
+        insQueue.push({tag: Syntax.applam, span: span2, ps})
         insQueue.push(...this.expr())
+        span = this.i
         continue
       }
       if (this.tryWord("{")) {
         let ps = this.idents(".")
-        insQueue.push({tag: Syntax.applam, span, ps})
+        insQueue.push({tag: Syntax.applam, span: span2, ps})
         insQueue.push(...this.expr())
         this.assertWord("}")
+        span = this.i
         continue
       }
       break
     }
-    insQueue.push({tag: Syntax.endapp, span: this.i})
+    insQueue.push({tag: Syntax.endapp, span})
     continue
   }
   break
