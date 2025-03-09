@@ -66,7 +66,8 @@ static invent(hint: string, taken: string[]) {
   while (taken.includes(hint)) {
     let [_, alpha, num] =
       hint.match(/(\D*)(\d*)/)
-    hint = alpha+(parseInt(num,10)+1)
+    let numstr = num===""?"0":parseInt(num,10)+1
+    hint = alpha + numstr
   }
   return hint
 }
