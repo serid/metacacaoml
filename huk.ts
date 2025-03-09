@@ -4,7 +4,7 @@ import { Syntax } from "./syntax.ts"
 import { Compiler } from './compile.ts'
 import { mangle } from './codegen.ts'
 
-function typeToString(ty: any) {
+function showType(ty: any) {
   if (ty===undefined||ty===null) return String(ty)
   switch (ty.tag) {
     case "any":
@@ -14,9 +14,9 @@ function typeToString(ty: any) {
     case "euse":
       return "?" + ty.name
     case "cons":
-      return `${ty.name}(${join(map(ty.args, typeToString), " ")})`
+      return `${ty.name}(${join(map(ty.args, showType), " ")})`
     case "arrow":
-      return `[${join(map(ty.domain, typeToString), " ")}]` + typeToString(ty.codomain)
+      return `[${join(map(ty.domain, showType), " ")}]` + showType(ty.codomain)
     default:
       nonExhaustiveMatch(ty.tag)
   }
@@ -26,15 +26,6 @@ const useType = {tag: "cons", name: "Type", args: []}
 
 function mkUse(name: string) {
   return {tag:"use",name}
-}
-
-function mkType(o: any) {
-  Object.setPrototypeOf(o, {
-    toString() {
-      return typeToString(this)
-    }
-  })
-  return o
 }
 
 // The item typechecker, named after Yenisei
@@ -179,7 +170,7 @@ static instantiate0(varMap: ObjectMap<string>, ty: any) {
   
 // bidir.pdf: [Г]A
 substitute(ty: any) {
-  //this.c.log(typeToString(ty))
+  //this.c.log(showType(ty))
   switch (ty.tag) {
   case "any":
   case "use":
@@ -224,8 +215,8 @@ solveEvarTo(name: string, solution: any) {
 }
 
 unify(ty1: any, ty2: any) {
-  /*write("unify", typeToString(ty1),
-    typeToString(ty2), this.ctx)*/
+  /*write("unify", showType(ty1),
+    showType(ty2), this.ctx)*/
   if (ty1.tag === "euse" &&
     ty2.tag === "euse" &&
     ty1.name === ty2.name)
@@ -244,7 +235,7 @@ unify(ty1: any, ty2: any) {
   switch (ty1.tag) {
     case "use":
       assert(ty2.tag === "use" && ty1.name === ty2.name,
-        `error: "${typeToString(ty1)}" is not a subtype of "${typeToString(ty2)}"` +
+        `error: "${showType(ty1)}" is not a subtype of "${showType(ty2)}"` +
         this.c.errorAt(0))
       break
     case "cons":
@@ -324,7 +315,7 @@ infer() {
       assert(fty.domain.length > 0)
       this.unify(receiver, fty.domain[0])
     }
-    //this.c.log("fty", typeToString(fty))
+    //this.c.log("fty", showType(fty))
     assertEq(fty.tag, "arrow") //todo evar
     
     for (let i of range(isMethod?1:0, fty.domain.length)) {
@@ -332,12 +323,12 @@ infer() {
       // this is necessary since context grows in information as we check arguments
       // todo: performance: only substitute remaining arguments
       fty = this.substitute(fty)
-      //this.c.log("new fty", typeToString(fty), this.ctx)
+      //this.c.log("new fty", showType(fty), this.ctx)
       
       let par = fty.domain[i]
       let ins = this.nextIns()
       assertL(ins.tag !== Syntax.endapp, () => "expected argument of type " +
-        typeToString(par) +
+        showType(par) +
         this.c.errorAt(ins.span))
       // simple application
       if (ins.tag !== Syntax.applam) {
@@ -375,7 +366,7 @@ infer() {
   
 check(ty: any) {
   let ins = this.stepIns()
-  //this.c.log("check", ins, typeToString(ty))
+  //this.c.log("check", ins, showType(ty))
   switch (ins.tag) {
   case Syntax.native:
     return

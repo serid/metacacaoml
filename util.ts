@@ -47,7 +47,7 @@ export function toString(o: any) {
     return r + "]"
   }
   if (typeof o === "object") {
-    let keys = [...Object.keys(o)]
+    let keys = Object.keys(o)
     if (keys.length === 0) return "{}"
     let r = `{ ${keys[0]}: ${prettyPrint(o[keys[0]])}`
     for (let i of range(1, keys.length))
