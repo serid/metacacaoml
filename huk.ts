@@ -136,7 +136,10 @@ getMethodNameAt(insLocation: number) {
 }
 
 // normalization by jit compilation
-normalize(tyExpr: any) {
+normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
+  try {
+  assertEq(tyExpr.tag, Syntax.nakedfun)
+
   //this.c.log("normalize", tyExpr)
   this.root.normalCounter++
   // prepare environment (it will be passed in params)
@@ -155,12 +158,20 @@ normalize(tyExpr: any) {
   let obj = `"use strict";\n` +
     this.c.cg.getItemCodegen(tyExpr, fixtures).codegen_()
   
-  //this.c.log("env:", env)
-  //this.c.log(`obj: function*(${join(paramNames)}) {\n${obj}\n}`)
-  let g = new GeneratorFunction(...paramNames, obj)(...args)
-  let normalized = nextLast(g)
-  //this.c.log("normalized:", normalized)
-  return normalized
+  try {
+    let g = new GeneratorFunction(...paramNames, obj)(...args)
+    let normalized = nextLast(g)
+    //this.c.log("normalized:", normalized)
+    return normalized
+  } catch (e) {
+    let log = `Env: ${prettyPrint(env)}\n` +
+      `Obj: function*(${join(paramNames)}) {\n${obj}\n}`
+    throw new CompileError(tyExpr.span, log, undefined, { cause: e })
+  }
+  } catch (e) {
+    if (e.constructor === CompileError) throw e
+    throw new CompileError(tyExpr.span, undefined, undefined, { cause: e })
+  }
 }
 
 getTakenEVarNames(): string[] {
