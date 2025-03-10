@@ -1,7 +1,7 @@
 import { assertEq, nonExhaustiveMatch, join, ObjectSet, setContains } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
-import { Compiler } from './compile.ts'
+import { CompileError, Compiler } from './compile.ts'
 
 export function mangle(path: string) {
   // hazard: unicode!!
@@ -30,6 +30,10 @@ export class ItemCodegen {
     this.nextVar = 0
     this.code = []
   }
+
+  ins() {
+    return this.item.arena[Math.max(this.k-1, 0)]
+  }
   
   nextIns() {
     return this.item.arena[this.k]
@@ -56,6 +60,7 @@ emitYieldStar(what: string): string {
 }
   
 expr(): string {
+  try {
   let insLocation = this.k
   let ins = this.stepIns()
   switch (ins.tag) {
@@ -122,9 +127,13 @@ expr(): string {
   default:
     nonExhaustiveMatch(ins.tag)
   }
+  } catch (e) {
+    throw new CompileError(this.ins().span, undefined, undefined, { cause: e })
+  }
 }
   
 codegen_() {
+  try {
   let item = this.item
 
   //write("cg", ins)
@@ -163,6 +172,10 @@ codegen_() {
     break
   default:
     nonExhaustiveMatch(item.tag)
+  }
+  } catch (e) {
+    if (e.constructor === CompileError) throw e
+    throw new CompileError(this.item.span, undefined, undefined, { cause: e })
   }
   return this.code.join("")
 }
