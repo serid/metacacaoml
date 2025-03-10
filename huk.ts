@@ -594,8 +594,6 @@ tyck() {
     //assert(this.ctx.)
     //if (this.c.logging) write(`fun ${name} analysis time`, performance.now()-beforeFun)
     break
-  case Syntax.eof:
-    break
   default:
     nonExhaustiveMatch(item.tag)
   }

@@ -9,7 +9,6 @@ function isPrefix(s: string, i: number, w: string) {
 }
 
 export class Syntax {
-static cls = Symbol("cls")
 static strlit = Symbol("strlit")
 static fun = Symbol("fun")
 static native = Symbol("native")
@@ -17,7 +16,7 @@ static app = Symbol("app")
 static endapp = Symbol("endapp")
 static use = Symbol("use")
 static endfun = Symbol("endfun")
-static eof = Symbol("eof")
+static cls = Symbol("cls")
 static applam = Symbol("applam")
 static let = Symbol("let")
 static arrow = Symbol("arrow")
@@ -381,6 +380,5 @@ toplevel() {
     fuel.step()
     yield this.toplevel()
   }
-  yield {tag:Syntax.eof, span: this.i}
 }
 }

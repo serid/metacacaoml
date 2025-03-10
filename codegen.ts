@@ -161,9 +161,6 @@ codegen_() {
   case Syntax.nakedfun:
     this.code.push(`  return ${this.expr()}`)
     break
-  case Syntax.eof:
-    this.code.push(`main().next()`)
-    break
   default:
     nonExhaustiveMatch(item.tag)
   }
@@ -189,6 +186,7 @@ export class RootCodegen {
   }
 
   getCode(): string {
+    this.code.push("main().next()")
     return this.code.join("")
   }
 
