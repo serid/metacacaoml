@@ -1,4 +1,4 @@
-import { assertEq, nonExhaustiveMatch, join, ObjectSet, setContains, last } from './util.ts'
+import { assertEq, nonExhaustiveMatch, join, ObjectSet, setContains, last, mapInsert } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { CompileError, Compiler } from './compile.ts'
@@ -94,7 +94,7 @@ expr(): string {
     // For methods, fetch full name produced by tyck, otherwise the fun is first expression
     //write(ins)
     let fun = ins.metName !== null ?
-      this.c.itemTyck.getMethodNameAt(insLocation) :
+      "_fixtures_."+this.c.itemTyck.getMethodNameAt(insLocation) :
       ixs.shift()
     
     // A contrived codegen spell indeed
@@ -198,27 +198,36 @@ codegen(): {name:string, code:string}[] {
 }
 
 step() {
-  let aToplevel = this.codegen().flatMap(
-    ({name, code}) => ["const ", name, " = ", code, "\n"]).join("")
+  let cgs = this.codegen()
+  let aToplevel = cgs.flatMap(
+    ({name, code}) => ["_fixtures_.", name, " = ", code, "\n"]).join("")
   this.root.code.push(aToplevel)
+  
+  for (let {name} of cgs)
+    mapInsert(this.fixtureNames, name, null)
 }
 }
 
 export class RootCodegen {
   c: any
   code: string[]
+  fixtureNames: ObjectSet
   
   constructor(c: any) {
     this.c = c // compiler
-    this.code = [`"use strict";\n`]
+    this.code = [
+      `"use strict";\n`,
+      `const _fixtures_ = Object.create(null)\n`
+    ]
+    this.fixtureNames = Object.create(null)
   }
   
-  getItemCodegen(item: any, fixtureNames: ObjectSet) {
+  getItemCodegen(item: any, fixtureNames: ObjectSet = this.fixtureNames) {
     return new ItemCodegen(this, item, fixtureNames)
   }
 
   getCode(): string {
-    this.code.push("main().next()")
+    this.code.push("_fixtures_.main().next()")
     return this.code.join("")
   }
 

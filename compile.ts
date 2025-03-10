@@ -83,7 +83,7 @@ export class Compiler {
     try {
       for (let item of items) {
         this.itemTyck = this.tyck.getItemTyck(item)
-        this.itemCg = this.cg.getItemCodegen(item, [])
+        this.itemCg = this.cg.getItemCodegen(item)
         this.itemTyck.tyck()
         this.itemCg.step()
       

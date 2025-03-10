@@ -12,7 +12,7 @@ class Bool
 | True()
 end
 fun bool-from-native(b:@any): Bool =
-  native[|b?yield*BoolᐅTrue():yield*BoolᐅFalse()|]
+  native[|b?yield*_fixtures_.BoolᐅTrue():yield*_fixtures_.BoolᐅFalse()|]
 
 class Int end
 fun .increment(x:Int): Int = native[|x+1|]
