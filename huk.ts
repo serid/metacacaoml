@@ -571,7 +571,11 @@ tyck() {
     })
 
     if (item.annots.length === 0)
-      this.check(codomain)
+      try {
+        this.check(codomain)
+      } catch (e) {
+        throw new CompileError(this.ins().span, this.log.join("\n"), undefined, { cause: e })
+      }
     else {
       let expected = item.annots[0].text
       try {
@@ -579,6 +583,7 @@ tyck() {
         error("expected error: "+expected)
       } catch (e) {
         assertEq(e.message, expected)
+        break
       }
     }
 
@@ -596,7 +601,7 @@ tyck() {
   }
   } catch (e) {
     if (e.constructor === CompileError) throw e
-    throw new CompileError(this.ins().span, this.log.join("\n"), undefined, { cause: e })
+    throw new CompileError(this.item.span, this.log.join("\n"), undefined, { cause: e })
   }
 }
 }
