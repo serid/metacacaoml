@@ -142,7 +142,13 @@ export function getOneOrDef<A>(g: Generator<A, void, void>, d: A) {
 
 
 
+export function unSingleton<A>(xs: A[]): A {
+  assertEq(xs.length, 1)
+  return xs[0]
+}
+
 export function last<A>(xs: A[]) {
+  assert(xs.length > 0, "array is empty")
   return xs[xs.length-1]
 }
 

@@ -85,7 +85,7 @@ export class Compiler {
         this.itemTyck = this.tyck.getItemTyck(item)
         this.itemCg = this.cg.getItemCodegen(item, [])
         this.itemTyck.tyck()
-        this.cg.code.push(this.itemCg.codegen())
+        this.itemCg.step()
       
         this.itemNetwork.resetCache()
       }
