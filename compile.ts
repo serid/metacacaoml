@@ -1,4 +1,4 @@
-import { toString, write } from './util.ts'
+import { assert, range, toString, write } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Huk, RootTyck } from "./huk.ts"
@@ -6,6 +6,18 @@ import { ItemCodegen, RootCodegen } from "./codegen.ts"
 import { Network } from './flow.ts'
 
 const std = await globalThis.Deno.readTextFile("./memlstd.rs")
+
+export class CompileError extends Error {
+  log: string
+  span: number
+
+  constructor(span: number, log?: string, message?: string,
+    options?: ErrorOptions) {
+    super(message, options)
+    this.log = log ?? ""
+    this.span = span
+  }
+}
 
 export class Compiler {
   src: string
@@ -41,6 +53,21 @@ export class Compiler {
     for (let x of xs) this.logs.push(toString(x), " ")
     this.logs.push("\n\n")
   }
+
+  reportError(e: CompileError) {
+    this.log(e.log)
+
+    let lineNumber = 0
+    for (let i of range(e.span)) if (this.src[i] === "\n") lineNumber++
+    let lineNumberString = lineNumber + " | "
+
+    // line begins after either line feed or -1
+    let lineStart = this.src.lastIndexOf("\n", e.span) + 1
+    let lineEnd = this.src.indexOf("\n", e.span)
+    if (lineEnd === -1) lineEnd = this.src.length
+    this.log(lineNumberString + this.src.substring(lineStart, lineEnd))
+    this.log(" ".repeat(lineNumberString.length + (e.span - lineStart)) + "^")
+  }
   
   errorAt(span: number) {
     return ` at "${this.src.substring(span, span + 20)}"`
@@ -56,17 +83,24 @@ export class Compiler {
   }
   
   analyze(items: Iterable<any>) {
-    for (let item of items) {
-      this.log("analyze", item)
-      this.itemTyck = this.tyck.getItemTyck(item)
-      this.itemCg = this.cg.getItemCodegen(item, [])
-      this.itemTyck.tyck()
-      this.cg.code.push(this.itemCg.codegen())
+    try {
+      for (let item of items) {
+        this.itemTyck = this.tyck.getItemTyck(item)
+        this.itemCg = this.cg.getItemCodegen(item, [])
+        this.itemTyck.tyck()
+        this.cg.code.push(this.itemCg.codegen())
       
-      this.itemNetwork.resetCache()
+        this.itemNetwork.resetCache()
+      }
+  
+      console.log(`normalizations count: ` + this.tyck.normalCounter)
+      return this.cg.getCode()
+    } catch (e) {
+      if (e.constructor !== CompileError) throw e
+      // this.log("analyze", item)
+      this.reportError(e)
+      assert(e.cause!==undefined, "expected cause")
+      throw e.cause
     }
-
-    console.log(`normalizations count: ` + this.tyck.normalCounter)
-    return this.cg.getCode()
   }
 }

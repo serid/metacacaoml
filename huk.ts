@@ -1,7 +1,7 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range, prettyPrint } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
-import { Compiler } from './compile.ts'
+import { CompileError, Compiler } from './compile.ts'
 import { mangle } from './codegen.ts'
 
 function showType(ty: any) {
@@ -18,7 +18,7 @@ function showType(ty: any) {
     case "arrow":
       return `[${ty.domain.map(showType).join(" ")}]` + showType(ty.codomain)
     default:
-      nonExhaustiveMatch(ty.tag)
+      return prettyPrint(ty)
   }
 }
 
@@ -28,6 +28,10 @@ function mkUse(name: string) {
   return {tag:"use",name}
 }
 
+function mkEUse(name: string) {
+  return {tag:"euse",name}
+}
+
 // The item typechecker, named after Yenisei
 export class Huk {
   c: Compiler
@@ -35,6 +39,11 @@ export class Huk {
   item: any
   k: number
   ctx: any[]
+
+  // log of typing judgements applied
+  depth: number
+  log: string[]
+
   methodNameAt: ObjectMap<string>
   funName: string
 
@@ -47,11 +56,18 @@ export class Huk {
     this.k = 0
     this.ctx = []
 
+    this.depth = 0
+    this.log = []
+
     // Codegen will be querying the methodname
     // Map<int, string>
     this.methodNameAt = Object.create(null)
     this.funName = null
   }
+
+ins() {
+  return this.item.arena[Math.max(this.k-1, 0)]
+}
 
 nextIns() {
   return this.item.arena[this.k]
@@ -70,6 +86,43 @@ static invent(hint: string, taken: string[]) {
     hint = alpha + numstr
   }
   return hint
+}
+
+showCtx() {
+  let s = map(this.ctx, x => {
+    switch (x.tag) {
+    case "uni": return x.name
+    case "var": return `${x.name}: ${showType(x.ty)}`
+    case "evar": return `?${x.name}`
+    case "esolve": return `?${x.name} = ${showType(x.solution)}`
+    default: return prettyPrint(x)
+    }
+  })
+  return join(s)
+}
+
+pushTyping(s: string) {
+  this.log.push("  ".repeat(this.depth) + s)
+}
+
+pushCtx() {
+  this.pushTyping("\x1b[33m" + this.showCtx() + "\x1b[0m")
+}
+
+enterTyping(s: string) {
+  this.pushTyping(s)
+  this.depth++
+}
+
+exitTyping(s: string) {
+  this.depth--
+  this.pushTyping(s)
+  this.pushCtx()
+}
+
+addTyping(s: string) {
+  this.pushTyping(s)
+  this.pushCtx()
 }
 
 getFunName() {
@@ -135,13 +188,18 @@ allocEVar(hint: string) {
 
 // Replace universal variables with existentials
 instantiate(vars: string[], ty: any) {
+  this.enterTyping(`|- inst(${prettyPrint(vars)}, ${showType(ty)})`)
+  
   //this.c.log("inst", ty)
   // generate fresh evar names
   let mapp = Object.create(null)
   let taken = this.getTakenEVarNames()
   for (let uniName of vars)
     mapp[uniName] = this.allocEVarMut(uniName, taken)
-  return Huk.instantiate0(mapp, ty)
+  
+  let ty1 = Huk.instantiate0(mapp, ty)
+  this.exitTyping(`-| inst(${prettyPrint(vars)}, ${showType(ty)}) -> ${showType(ty1)}`)
+  return ty1
 }
 
 static instantiate0(varMap: ObjectMap<string>, ty: any) {
@@ -171,6 +229,7 @@ static instantiate0(varMap: ObjectMap<string>, ty: any) {
   
 // bidir.pdf: [Г]A
 substitute(ty: any) {
+  //this.addTyping(`[${this.showCtx()}]${showType(ty)}`)
   //this.c.log(showType(ty))
   switch (ty.tag) {
   case "any":
@@ -203,6 +262,7 @@ substitute(ty: any) {
 }
 
 solveEvarTo(name: string, solution: any) {
+  this.addTyping(`|- ?${name} <:= ${showType(solution)}`)
   //this.c.log("solve evar", name, solution)
   assert(!this.ctx.some(
     x => x.tag === "esolve" && x.name === name),
@@ -215,7 +275,7 @@ solveEvarTo(name: string, solution: any) {
   //todo: occurs check
 }
 
-unify(ty1: any, ty2: any) {
+unify_(ty1: any, ty2: any) {
   /*write("unify", showType(ty1),
     showType(ty2), this.ctx)*/
   if (ty1.tag === "euse" &&
@@ -263,8 +323,14 @@ unify(ty1: any, ty2: any) {
       nonExhaustiveMatch(ty1.tag)
   }
 }
-  
-infer() {
+
+unify(ty1: any, ty2: any) {
+  this.enterTyping(`|- ${showType(ty1)} <: ${showType(ty2)}`)
+  this.unify_(ty1, ty2)
+  this.exitTyping(`-| ${showType(ty1)} <: ${showType(ty2)}`)
+}
+
+infer_() {
   let insLocation = this.k
   let ins = this.stepIns()
   //this.c.log("infer", ins, this.ctx)
@@ -289,7 +355,7 @@ infer() {
   case Syntax.array:
     // if array is empty, element type is a fresh evar, otherwise infer
     let elementTy = this.nextIns().tag===Syntax.endarray ?
-      {tag:"euse", name:this.allocEVar("Arr")} :
+      mkEUse(this.allocEVar("Arr")) :
       this.infer()
 
     while (this.nextIns().tag!==Syntax.endarray)
@@ -336,10 +402,21 @@ infer() {
         this.check(par)
         continue
       }
-      this.k++
+
       // application of trailing lambda
-      assertEq(par.tag, "arrow")
-      assertEq(par.domain.length, ins.ps.length)
+      this.k++
+      if (par.tag !== "euse") {
+        assertEq(par.tag, "arrow")
+        assertEq(par.domain.length, ins.ps.length)
+      } else {
+        let newPar = {
+          tag:"arrow",
+          domain:ins.ps.map(_=>mkEUse(this.allocEVar("H"))),
+          codomain:mkEUse(this.allocEVar("CH"))
+        }
+        this.solveEvarTo(par.name, newPar)
+        par = newPar
+      }
       let ps = ins.ps
       for (let j of range(par.domain.length)) {
         this.ctx.push({
@@ -364,7 +441,14 @@ infer() {
     nonExhaustiveMatch(ins.tag)
   }
 }
-  
+
+infer() {
+  this.enterTyping(`|- _ => ?`)
+  let ty = this.infer_()
+  this.exitTyping(`-| _ => ${showType(ty)}`)
+  return ty
+}
+
 check(ty: any) {
   let ins = this.stepIns()
   //this.c.log("check", ins, showType(ty))
@@ -388,6 +472,7 @@ check(ty: any) {
 }
   
 tyck() {
+  try {
   let item = this.item
   switch (item.tag) {
   case Syntax.cls: {
@@ -503,6 +588,10 @@ tyck() {
     break
   default:
     nonExhaustiveMatch(item.tag)
+  }
+  } catch (e) {
+    if (e.constructor === CompileError) throw e
+    throw new CompileError(this.ins().span, this.log.join("\n"), undefined, { cause: e })
   }
 }
 }
