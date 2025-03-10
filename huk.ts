@@ -143,7 +143,7 @@ normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
   let fixtures = mapMap(this.root.globals,
     ({value})=>value===null?null:value.get())
   let env = Object.create(null)
-  env.__fixtures__ = fixtures
+  env._fixtures_ = fixtures
   for (let x of this.ctx) {
     if (x.tag === "uni")
       env[x.name] = {tag:"use",name:x.name}

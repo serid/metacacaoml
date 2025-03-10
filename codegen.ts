@@ -77,7 +77,7 @@ expr(): string {
   case Syntax.use:
     let name = ins.name
     return setContains(this.fixtureNames, name) ?
-      "__fixtures__."+name : name
+      "_fixtures_."+name : name
   case Syntax.array: {
     let ixs: string[] = []
     while (this.nextIns().tag!==Syntax.endarray)
