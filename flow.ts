@@ -18,7 +18,7 @@ export class Network {
     this.resetCache()
   }
 
-  memoize(path: string, args: string[], duct: (..._: string[]) => any): any {
+  memoize<A>(path: string, args: string[], duct: (..._: string[]) => A): A {
     // note: this reactivity style requires `duct` closure
     // to be allocated on every call, in contrast to `register` style
 

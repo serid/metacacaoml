@@ -38,10 +38,7 @@ export class Compiler {
     this.cg = new RootCodegen(this)
     this.itemCg = <ItemCodegen><unknown>null
     this.itemNetwork = new Network([
-      "fun-name",
-      "method-name-at",
       "codegen-item",
-      "jit-compile",
     ])
 
     //this.tyck.initializeDucts(this.itemNetwork)

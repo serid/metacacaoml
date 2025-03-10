@@ -125,14 +125,11 @@ addTyping(s: string) {
 }
 
 getFunName() {
-  return this.c.itemNetwork.memoize("fun-name", [], () => this.funName)
+  return this.funName
 }
 
 getMethodNameAt(insLocation: number) {
-  return this.c.itemNetwork.memoize("method-name-at", [insLocation.toString()],
-    (insLocation) => {
-    return mapGet(this.methodNameAt, insLocation)
-  })
+  return mapGet(this.methodNameAt, insLocation)
 }
 
 // normalization by jit compilation
