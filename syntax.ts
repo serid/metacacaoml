@@ -1,3 +1,4 @@
+import { mangle } from './codegen.ts'
 import { error, assert, assertL, assertEq, fuel, nonExhaustiveMatch, getOne, range, last, any } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
@@ -123,7 +124,7 @@ ident() {
     this.i++
   }
   this.tryWhitespace()
-  return id
+  return mangle(id)
 }
 
 assertIdent() {
@@ -252,7 +253,7 @@ expr() {
     for (let i of range(subexprs.length-1)) {
       insQueue.push({tag:Syntax.app, span, metName:null})
       insQueue.push({tag:Syntax.use, span,
-        name:"Pair/New"})
+        name:"PairᐅNew"})
       insQueue.push(...subexprs[i])
     }
     insQueue.push(...last(subexprs))

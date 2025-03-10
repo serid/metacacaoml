@@ -2,7 +2,6 @@ import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLa
 
 import { Syntax } from "./syntax.ts"
 import { CompileError, Compiler } from './compile.ts'
-import { mangle } from './codegen.ts'
 
 function showType(ty: any) {
   if (ty===undefined||ty===null) return String(ty)
@@ -372,7 +371,7 @@ infer_() {
       let receiver = this.infer()
       assertEq(receiver.tag, "cons")
       
-      let methodName = receiver.name+"/"+ins.metName
+      let methodName = receiver.name+"ᐅ"+ins.metName
       mapInsert(this.methodNameAt, insLocation, methodName)
       let gb = this.root.globals[methodName]
       
@@ -505,7 +504,7 @@ tyck() {
       args:item.gs.map(mkUse)
     }
     for (let c of normalConss) {
-      mapInsert(this.root.globals, item.name+"/"+c.name, {
+      mapInsert(this.root.globals, item.name+"ᐅ"+c.name, {
         gs: item.gs,
         ty: {tag: "arrow", domain: c.fields, codomain: self},
         value: null // todo
@@ -517,7 +516,7 @@ tyck() {
       codomain: mkUse(ret)
     })
     ))
-    mapInsert(this.root.globals, item.name+"/elim", {
+    mapInsert(this.root.globals, item.name+"ᐅelim", {
       gs: item.gs.concat([ret]),
       ty: {tag: "arrow", domain: domain, codomain: mkUse(ret)},
       value: null // todo
@@ -553,7 +552,7 @@ tyck() {
     if (item.isMethod) {
       assert(item.bs.length >= 1)
       assertEq(domain[0].tag, "cons")
-      name = domain[0].name + "/" + item.name
+      name = domain[0].name + "ᐅ" + item.name
     } else name = item.name
     this.funName = name
 
@@ -577,7 +576,7 @@ tyck() {
 
     // fill-in the fixture
     mapGet(this.root.globals, name).value.set(
-      eval?.(this.c.itemCg.codegen() + mangle(name))
+      eval?.(this.c.itemCg.codegen() + name)
     )
 
     // check if all evars are solved? no

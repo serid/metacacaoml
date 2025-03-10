@@ -1,4 +1,4 @@
-import { assertEq, nonExhaustiveMatch, join, any, ObjectSet, setContains } from './util.ts'
+import { assertEq, nonExhaustiveMatch, join, ObjectSet, setContains } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Compiler } from './compile.ts'
@@ -8,7 +8,7 @@ export function mangle(path: string) {
   // characters found using shapecatcher.com
   path = path.replaceAll("/", "ᐅ")
   path = path.replaceAll("-", "ᜭ")
-  path = path === "let" ? "Ξlet" : path
+  if (["let"].includes(path)) path = "Ξ"+path
   return path
 }
 
@@ -67,10 +67,8 @@ expr(): string {
     return `${ins.data}`
   case Syntax.use:
     let name = ins.name
-    return mangle(
-      setContains(this.fixtureNames, name)
-      ? "__fixtures__."+name
-      : name)
+    return setContains(this.fixtureNames, name) ?
+      "__fixtures__."+name : name
   case Syntax.array: {
     let ixs: string[] = []
     while (this.nextIns().tag!==Syntax.endarray)
@@ -87,7 +85,7 @@ expr(): string {
     // For methods, fetch full name produced by tyck, otherwise the fun is first expression
     //write(ins)
     let fun = ins.metName !== null ?
-      mangle(this.c.itemTyck.getMethodNameAt(insLocation)) :
+      this.c.itemTyck.getMethodNameAt(insLocation) :
       ixs.shift()
     
     // A contrived codegen spell indeed
@@ -102,7 +100,7 @@ expr(): string {
     if (ins.tag === Syntax.endapp) break
     assertEq(ins.tag, Syntax.applam)
     
-    this.code.push(`  function*(${join(ins.ps.map(mangle))}) {\n`)
+    this.code.push(`  function*(${join(ins.ps)}) {\n`)
     let retIx = this.expr()
     this.code.push(`  return ${retIx}\n  },\n`)
     }
@@ -133,13 +131,12 @@ codegen_() {
   switch (item.tag) {
   case Syntax.cls:
     let elimCode = []
-    let fullname = mangle(item.name+"/elim")
     let ps = join(item.conss.map(x=>x.name))
-    elimCode.push(`function* ${fullname}(self, ${ps}) {\n  switch (self.tag) {\n`)
+    elimCode.push(`function* ${item.name}ᐅelim(self, ${ps}) {\n  switch (self.tag) {\n`)
     for (let c of item.conss) {
       let ps = c.fields.map(x=>x.name)
       let bs = join(ps)
-      let fullname = mangle(item.name+"/"+c.name)
+      let fullname = item.name+"ᐅ"+c.name
       this.code.push(`function* ${fullname}(${bs}) {\n  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`)
       let as = join(ps.map(x=>"self."+x))
       //todo: eliminate yield*
@@ -150,13 +147,13 @@ codegen_() {
     this.code.push(elimCode.join(""))
     break
   case Syntax.let:
-    this.code.push(`const ${mangle(item.name)} = (function*() {\n`)
+    this.code.push(`const ${item.name} = (function*() {\n`)
     let retIx = this.expr()
     this.code.push(`  return ${retIx}\n})().next().value;\n`)
     break
   case Syntax.fun:
-    let bs = item.bs.map(x=>mangle(any(x).name))
-    this.code.push(`function* ${mangle(this.c.itemTyck.funName)}(${join(bs)}) {\n`)
+    let bs = item.bs.map(x=>x.name)
+    this.code.push(`function* ${this.c.itemTyck.funName}(${join(bs)}) {\n`)
     let retIx2 = this.expr()
     
     this.code.push(`  return ${retIx2}\n}\n`)
