@@ -152,7 +152,7 @@ normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
   let paramNames = envv.map(x=>x[0])
   let args = envv.map(x=>x[1])
   
-  let cgs = this.c.cg.getItemCodegen(tyExpr, fixtures).codegenUncached()
+  let cgs = this.c.cg.getItemCodegen(tyExpr).codegenUncached()
   assertEq(Object.keys(cgs), ["_"])
   let obj = `"use strict";\n` + cgs._
   

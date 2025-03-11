@@ -16,16 +16,14 @@ export class ItemCodegen {
   c: Compiler
   root: RootCodegen
   item: any
-  fixtureNames: ObjectSet
   k: number // points one past the current instruction
   nextVar: number
   code: string[]
   
-  constructor(root: RootCodegen, item: any, fixtureNames: ObjectSet) {
+  constructor(root: RootCodegen, item: any) {
     this.c = root.c
     this.root = root // toplevel codegen
     this.item = item
-    this.fixtureNames = fixtureNames
     this.k = 0
     this.nextVar = 0
     this.code = []
@@ -80,7 +78,7 @@ expr(): string {
     return `${ins.data}`
   case Syntax.use:
     let name = ins.name
-    return setContains(this.fixtureNames, name) ?
+    return setContains(this.c.tyck.globals, name) ?
       "_fixtures_."+name : name
   case Syntax.array: {
     let ixs: string[] = []
@@ -210,16 +208,12 @@ step() {
   let aToplevel = Object.entries(cgs).flatMap(
     ([name, code]) => ["_fixtures_.", name, " = ", code, "\n"]).join("")
   this.root.code.push(aToplevel)
-  
-  for (let name in cgs)
-    mapInsert(this.fixtureNames, name, null)
 }
 }
 
 export class RootCodegen {
   c: any
   code: string[]
-  fixtureNames: ObjectSet
   
   constructor(c: any) {
     this.c = c // compiler
@@ -227,11 +221,10 @@ export class RootCodegen {
       `"use strict";\n`,
       `const _fixtures_ = Object.create(null)\n`
     ]
-    this.fixtureNames = Object.create(null)
   }
   
-  getItemCodegen(item: any, fixtureNames: ObjectSet = this.fixtureNames) {
-    return new ItemCodegen(this, item, fixtureNames)
+  getItemCodegen(item: any) {
+    return new ItemCodegen(this, item)
   }
 
   getCode(): string {
