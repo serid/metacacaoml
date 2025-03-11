@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range, prettyPrint } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range, prettyPrint, mapRemove } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { CompileError, Compiler } from './compile.ts'
@@ -583,6 +583,8 @@ tyck() {
         error("expected error: "+expected)
       } catch (e) {
         assertEq(e.message, expected)
+
+        mapRemove(this.root.globals, name)
         break
       }
     }

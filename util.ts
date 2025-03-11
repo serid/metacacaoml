@@ -108,6 +108,11 @@ export function mapGet<A>(o: ObjectMap<A>, key: string | number) {
   return value
 }
 
+export function mapRemove<A>(o: ObjectMap<A>, key: string | number) {
+  assert(o[key] !== undefined, "key not present: "+key)
+  delete o[key]
+}
+
 export function mapMap<A, B>(o: ObjectMap<A>, f: (_: A) => B) {
   let out: ObjectMap<B> = Object.create(null)
   for (let k in o) {
