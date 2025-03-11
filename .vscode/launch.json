@@ -4,13 +4,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Attach",
-            "port": 9229,
+            "name": "Launch",
+            "type": "node",
             "request": "attach",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "type": "node"
+            "port": 9229,
+
+            "preLaunchTask": "Deno Debug"
         }
     ]
 }

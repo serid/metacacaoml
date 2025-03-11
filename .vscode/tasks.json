@@ -1,0 +1,36 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Deno Debug",
+            "type": "shell",
+            "command": "deno run --inspect-wait --allow-read main.ts",
+            "isBackground": true,
+            "presentation": {
+                "clear": true,
+                "showReuseMessage": false
+            },
+
+            // By default VS Code debugger will be waiting for this
+            // preLaunchTask to finish or to signal it has processed the files
+            // without "problems"
+            "problemMatcher": [
+                {
+                "pattern": [
+                    {
+                    "regexp": ".",
+                    "file": 1,
+                    "location": 2,
+                    "message": 3
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".",
+                    "endsPattern": ".",
+                }
+                }
+            ]
+        }
+    ]
+}
