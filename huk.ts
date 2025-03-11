@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range, prettyPrint, mapRemove } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range, prettyPrint, mapRemove, mapFilterMapProjection } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { CompileError, Compiler } from './compile.ts'
@@ -140,10 +140,8 @@ normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
   //this.c.log("normalize", tyExpr)
   this.root.normalCounter++
   // prepare environment (it will be passed in params)
-  let fixtures = mapMap(this.root.globals,
-    ({value})=>value===null?null:value.get())
   let env = Object.create(null)
-  env._fixtures_ = fixtures
+  env._fixtures_ = this.root.fixtures
   for (let x of this.ctx) {
     if (x.tag === "uni")
       env[x.name] = {tag:"use",name:x.name}
@@ -614,6 +612,7 @@ tyck() {
 export class RootTyck {
   c: any
   globals: ObjectMap<{gs: string[], ty: any, value: LateInit<any>}>
+  fixtures: ObjectMap<any>
   normalCounter: number
 
   constructor(c: any) {
@@ -621,7 +620,13 @@ export class RootTyck {
     // A fixture is a value or a function present at compilation time. C++ calls this constexpr and in Zig it's comptime
     // types and fixture values of global declarations
     // Map<string, {ty, value}>
-    this.globals = Object.create(null)
+    let globals: ObjectMap<{gs: string[], ty: any, value: LateInit<any>}> =
+      Object.create(null)
+    this.globals = globals
+    this.fixtures = mapFilterMapProjection(this.globals, (_name, entry) => {
+      if (entry.value === null) return null
+      return entry.value.get()
+    })
     this.normalCounter = 0
   }
   

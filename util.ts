@@ -113,6 +113,24 @@ export function mapRemove<A>(o: ObjectMap<A>, key: string | number) {
   delete o[key]
 }
 
+// create a projection of a map that has all same entries with
+// values filtered and transformed by f
+export function mapFilterMapProjection<A, B>(o: ObjectMap<A>, f: (name: string, code: A) => B | null): ObjectMap<B> {
+  return any(new Proxy(o, {
+    get(target, key: string, _receiver) {
+      let value = Reflect.get(target, key)
+      if (value === undefined) return undefined
+      let out = f(key, value)
+      assert(out !== null, key + " is null")
+      return out
+    },
+    
+    ownKeys(target) {
+      return [...filterMap(Object.entries(target), ([k,v])=>f(k,v)===null?null:k)]
+    }
+  }))
+}
+
 export function mapMap<A, B>(o: ObjectMap<A>, f: (_: A) => B) {
   let out: ObjectMap<B> = Object.create(null)
   for (let k in o) {
@@ -209,6 +227,13 @@ export function* map<A, B>(i: Iterable<A>, f: (_: A) => B) {
 
 export function* filter<A>(i: Iterable<A>, f: (_: A) => boolean) {
   for (let x of i) if (f(x)) yield x
+}
+
+export function* filterMap<A, B>(i: Iterable<A>, f: (_: A) => B | null) {
+  for (let x of i) {
+    let y = f(x)
+    if (y !== null) yield y
+  }
 }
 
 export function foldl<A, B>(i: Iterable<B>, s: A, c: (_: A, _0: B) => A) {
