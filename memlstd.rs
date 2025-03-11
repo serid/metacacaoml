@@ -29,9 +29,6 @@ class Pair 'A 'B
 | New(A B)
 end
 
-let -check-tuple1: Pair(Int Pair(String Bool)) = (1 "" Bool/True())
-let -check-tuple2: Int = (((1)))
-
 class Box 'A
 | New(A)
 end
@@ -45,12 +42,6 @@ class Option 'A
 | Some(A)
 end
 
-# Adds constructors and a matching function to global scope
-# Matching function Option/elim analyses the object in first parameter and chooses one of lambdas passed to it, while giving it the object's fields
-
-let -check1: [Option(Int) []String [Int]String] String
-  = Option/elim
-
 class Array 'A end
 fun .length('A xs:Array(A)): Int =
   native[|xs.length|]
@@ -63,8 +54,6 @@ fun .shallow-copy('A xs:Array(A)): Array(A) =
 fun .sort('A xs:Array(A) cmp:[A A]Int): Array(A) =
   native[|[...xs].sort(cmp)|]
 
-# [A]B is a type of functions from A to B.
-# Function calls are parenthesised.
 fun let('A 'B x:A f:[A]B): B = f(x)
 fun write('A x:A): Unit = anyways(
   native[|console.log(x)|])
@@ -96,7 +85,3 @@ fun .map('A 'B i:Iter(A) f:[A]B): Iter(B) =
   Option/elim(i.unpack()())
   { . Option/None() }
   { x. Option/Some(f(x)) }
-
-
-
-let -check-id: id(Int) = 1
