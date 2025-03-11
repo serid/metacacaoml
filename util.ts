@@ -15,8 +15,14 @@ export function assertL(b: boolean, le: () => string) {
 }
 
 export function assertEq(x: any, y: any) {
-  assertL(x === y, () => `found ${prettyPrint(x)}, expected ${prettyPrint(y)}`)
+  assertL(deepEqual(x, y), () =>
+    `found ${prettyPrint(x)}, expected ${prettyPrint(y)}`)
   return x
+}
+
+export function typeof2(o: any) {
+  if (Array.isArray(o)) return "array"
+  return typeof o
 }
 
 export function* range(a: number, b?: number, step: number = 1) {
@@ -71,6 +77,22 @@ export function nonExhaustiveMatch(o: any) {
 }
 
 
+export function deepEqual(x: any, y: any) {
+  if (x === y) return true
+
+  assertL(typeof2(x) === typeof2(y), () =>
+    `found ${prettyPrint(x)}, expected ${prettyPrint(y)}`)
+
+  switch (true) {
+  case Array.isArray(x):
+    if (x.length !== y.length) return false
+    for (let i of range(x.length))
+      if (!deepEqual(x[i], y[i])) return false
+    return true
+  default:
+    return false
+  }
+}
 
 export interface ObjectMap<A> { [k: string]: A }
 

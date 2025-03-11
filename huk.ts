@@ -311,8 +311,7 @@ unify_(ty1: any, ty2: any) {
     case "cons":
       assertEq(ty2.tag, "cons")
       assertEq(ty1.name, ty2.name)
-      assertEq(ty1.args.length, ty2.args.length)
-      for (let i of range(ty1.args.length)) {
+      for (let i of range(assertEq(ty1.args.length, ty2.args.length))) {
         this.unify(ty1.args[i], ty2.args[i])
         ty1 = this.substitute(ty1)
         ty2 = this.substitute(ty2)
@@ -590,10 +589,9 @@ tyck() {
     }
 
     let cgs = unSingleton(this.c.itemCg.codegen())
-    assertEq(cgs.name, name)
 
     // fill-in the fixture
-    mapGet(this.root.globals, name).value.set(
+    mapGet(this.root.globals, assertEq(cgs.name, name)).value.set(
       eval?.(cgs.code)
     )
 
