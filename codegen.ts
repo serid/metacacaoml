@@ -1,4 +1,4 @@
-import { assertEq, nonExhaustiveMatch, join, ObjectSet, setContains, last, mapInsert } from './util.ts'
+import { assertEq, nonExhaustiveMatch, join, ObjectSet, setContains, last, mapInsert, ObjectMap } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { CompileError, Compiler } from './compile.ts'
@@ -19,7 +19,7 @@ export class ItemCodegen {
   fixtureNames: ObjectSet
   k: number // points one past the current instruction
   nextVar: number
-  code: {name:string, code:string[]}[]
+  code: string[]
   
   constructor(root: RootCodegen, item: any, fixtureNames: ObjectSet) {
     this.c = root.c
@@ -47,19 +47,23 @@ export class ItemCodegen {
     return "_" + this.nextVar++
   }
 
-  push(s: string) {
-    last(this.code).code.push(s)
+  unshiftCode() {
+    let out = this.code.join("")
+    this.code = []
+    return out
   }
 
   emitSsa(e: string) {
     let ix = this.alloc()
-    this.push(`  const ${ix} = ${e}\n`)
+    this.code.push(`  const ${ix} = ${e}\n`)
     return ix
   }
 
 emitYieldStar(what: string): string {
   let yieldReturnVar = this.alloc()
-  this.push(`  let ${yieldReturnVar}; while (true) { let pair = ${what}.next(); if (pair.done) { ${yieldReturnVar} = pair.value; break } yield pair.value }\n`)
+  this.code.push(`  let ${yieldReturnVar}; while (true) { let pair = ${what}` +
+    `.next(); if (pair.done) { ${yieldReturnVar} = pair.value; break }` +
+    ` yield pair.value }\n`)
   return yieldReturnVar
 }
   
@@ -109,12 +113,12 @@ expr(): string {
     if (ins.tag === Syntax.endapp) break
     assertEq(ins.tag, Syntax.applam)
     
-    this.push(`  function*(${join(ins.ps)}) {\n`)
+    this.code.push(`  function*(${join(ins.ps)}) {\n`)
     let retIx = this.expr()
-    this.push(`  return ${retIx}\n  },\n`)
+    this.code.push(`  return ${retIx}\n  },\n`)
     }
     
-    this.push("  );\n")
+    this.code.push(`  );\n`)
     return this.emitYieldStar(genIx)
     
   // types
@@ -138,9 +142,10 @@ expr(): string {
 }
 
 // list of key-value pairs to add to the global object
-codegenUncached(): {name:string, code:string}[] {
+codegenUncached(): ObjectMap<string> {
   try {
   let item = this.item
+  let toplevels: ObjectMap<string> = Object.create(null)
 
   //write("cg", ins)
   switch (item.tag) {
@@ -151,59 +156,62 @@ codegenUncached(): {name:string, code:string}[] {
     for (let c of item.conss) {
       let ps = c.fields.map(x=>x.name)
       let bs = join(ps)
-      this.code.push({name:item.name+"ᐅ"+c.name, code:[
-        `function*(${bs}) {\n`,
-        `  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`
-      ]})
+      this.code.push(
+        `function*(${bs}) {\n` +
+        `  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`)
       let as = join(ps.map(x=>"self."+x))
       //todo: eliminate yield*
-      elimCode.push(`  case Symbol.for("${c.name}"): `)
-      elimCode.push(`return yield* ${c.name}(${as});\n`)
+      elimCode.push(
+        `  case Symbol.for("${c.name}"): ` +
+        `return yield* ${c.name}(${as});\n`)
+      mapInsert(toplevels, item.name+"ᐅ"+c.name, this.unshiftCode())
     }
-    elimCode.push(`  default: throw new Error("nonexhaustive: " + self.tag.description)\n`)
-    elimCode.push("  }\n}\n")
-    this.code.push({name:item.name+"ᐅelim", code:elimCode})
+    elimCode.push(
+      `  default: throw new Error("nonexhaustive: "` +
+      ` + self.tag.description)\n` +
+      `  }\n}\n`)
+    mapInsert(toplevels, item.name+"ᐅelim", elimCode.join(""))
     break
   case Syntax.let:
-    this.code.push({name:item.name, code:[`(function*() {\n`]})
+    this.code.push(`(function*() {\n`)
     let retIx = this.expr()
-    this.push(`  return ${retIx}\n})().next().value`)
+    this.code.push(`  return ${retIx}\n})().next().value`)
+    mapInsert(toplevels, item.name, this.unshiftCode())
     break
   case Syntax.fun:
     let bs = item.bs.map(x=>x.name)
-    this.code.push({name:this.c.itemTyck.funName, code:[`(function*(${join(bs)}) {\n`]})
+    this.code.push(`(function*(${join(bs)}) {\n`)
     let retIx2 = this.expr()
     
-    this.push(`  return ${retIx2}\n})`)
+    this.code.push(`  return ${retIx2}\n})`)
+    mapInsert(toplevels, this.c.itemTyck.funName, this.unshiftCode())
     break
   case Syntax.nakedfun:
-    this.code.push({name:"_", code:[]})
-    this.push(`  return ${this.expr()}`)
+    this.code.push(`  return ${this.expr()}`)
+    mapInsert(toplevels, "_", this.unshiftCode())
     break
   default:
     nonExhaustiveMatch(item.tag)
   }
+  return toplevels
   } catch (e) {
     if (e.constructor === CompileError) throw e
     throw new CompileError(this.item.span, undefined, undefined, { cause: e })
   }
-  let out: {name:string, code:any}[] = this.code
-  for (let pair of out) pair.code = pair.code.join("")
-  return out
 }
 
-codegen(): {name:string, code:string}[] {
+codegen(): ObjectMap<string> {
   return this.c.itemNetwork.memoize(
     "codegen-item", [], this.codegenUncached.bind(this))
 }
 
 step() {
   let cgs = this.codegen()
-  let aToplevel = cgs.flatMap(
-    ({name, code}) => ["_fixtures_.", name, " = ", code, "\n"]).join("")
+  let aToplevel = Object.entries(cgs).flatMap(
+    ([name, code]) => ["_fixtures_.", name, " = ", code, "\n"]).join("")
   this.root.code.push(aToplevel)
   
-  for (let {name} of cgs)
+  for (let name in cgs)
     mapInsert(this.fixtureNames, name, null)
 }
 }
@@ -227,7 +235,7 @@ export class RootCodegen {
   }
 
   getCode(): string {
-    this.code.push("_fixtures_.main().next()")
+    this.code.push(`_fixtures_.main().next()`)
     return this.code.join("")
   }
 

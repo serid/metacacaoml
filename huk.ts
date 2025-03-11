@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range, prettyPrint, unSingleton } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range, prettyPrint } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { CompileError, Compiler } from './compile.ts'
@@ -152,10 +152,9 @@ normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
   let paramNames = envv.map(x=>x[0])
   let args = envv.map(x=>x[1])
   
-  let cgs = unSingleton(
-    this.c.cg.getItemCodegen(tyExpr, fixtures).codegenUncached())
-  assertEq(cgs.name, "_")
-  let obj = `"use strict";\n` + cgs.code
+  let cgs = this.c.cg.getItemCodegen(tyExpr, fixtures).codegenUncached()
+  assertEq(Object.keys(cgs), ["_"])
+  let obj = `"use strict";\n` + cgs._
   
   try {
     let g = new GeneratorFunction(...paramNames, obj)(...args)
@@ -588,11 +587,12 @@ tyck() {
       }
     }
 
-    let cgs = unSingleton(this.c.itemCg.codegen())
+    let cgs = this.c.itemCg.codegen()
+    assertEq(Object.keys(cgs), [name])
 
     // fill-in the fixture
-    mapGet(this.root.globals, assertEq(cgs.name, name)).value.set(
-      eval?.(cgs.code)
+    mapGet(this.root.globals, name).value.set(
+      eval?.(cgs[name])
     )
 
     // check if all evars are solved? no
