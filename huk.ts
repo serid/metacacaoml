@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapMap, mapGet, LateInit, range, prettyPrint, mapRemove, mapFilterMapProjection } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapGet, LateInit, range, prettyPrint, mapRemove, mapFilterMapProjection } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { CompileError, Compiler } from './compile.ts'
@@ -130,6 +130,16 @@ getFunName() {
 
 getMethodNameAt(insLocation: number) {
   return mapGet(this.methodNameAt, insLocation)
+}
+
+// jit compile and close the code with a _fixtures_ object
+jitCompile(code: string): Function {
+  try {
+  code = `"use strict";\nreturn ` + code
+  return new Function("_fixtures_", code)(this.root.fixtures)
+  } catch (e) {
+    throw new CompileError(this.item.span, "Obj:"+code, undefined, { cause: e })
+  }
 }
 
 // normalization by jit compilation
@@ -495,7 +505,7 @@ tyck() {
         return {tag:"cons", name:item.name, args:xs}
       })
     })
-    
+
     // add generics to ctx
     for (let name of item.gs)
       this.ctx.push({tag: "uni", name})
@@ -505,15 +515,23 @@ tyck() {
         this.normalize(f.type)
       )
     }))
+
+    // codegen constructors and eliminator
+    let conssCode = this.c.itemCg.codegen()
+    let conssFuns = mapFilterMapProjection(conssCode,
+      (_name, code) => this.jitCompile(code)
+    )
+
     let self = {tag: "cons", 
       name:item.name,
       args:item.gs.map(mkUse)
     }
     for (let c of normalConss) {
+      let name = item.name+"ᐅ"+c.name
       mapInsert(this.root.globals, item.name+"ᐅ"+c.name, {
         gs: item.gs,
         ty: {tag: "arrow", domain: c.fields, codomain: self},
-        value: null // todo
+        value: new LateInit(conssFuns[name])
       })
     }
     let ret = Huk.invent("R", item.gs)
@@ -522,22 +540,28 @@ tyck() {
       codomain: mkUse(ret)
     })
     ))
-    mapInsert(this.root.globals, item.name+"ᐅelim", {
+    let name = item.name+"ᐅelim"
+    mapInsert(this.root.globals, name, {
       gs: item.gs.concat([ret]),
       ty: {tag: "arrow", domain: domain, codomain: mkUse(ret)},
-      value: null // todo
+      value: new LateInit(conssFuns[name])
     })
     break
   }
-  case Syntax.let:
+  case Syntax.let: {
     let ty = this.normalize(item.retT)
     this.check(ty)
+
+    let cgs = this.c.itemCg.codegen()
+    assertEq(Object.keys(cgs), [item.name])
+
     mapInsert(this.root.globals, item.name, {
       gs: [],
       ty,
-      value: null // todo
+      value: new LateInit(this.jitCompile(cgs[item.name]))
     })
     break
+  }
   case Syntax.fun:
     //let beforeFun = performance.now()
     assert(item.annots.length <= 1)
@@ -592,7 +616,7 @@ tyck() {
 
     // fill-in the fixture
     mapGet(this.root.globals, name).value.set(
-      eval?.(cgs[name])
+      this.jitCompile(cgs[name])
     )
 
     // check if all evars are solved? no

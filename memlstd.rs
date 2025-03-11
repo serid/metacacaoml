@@ -85,3 +85,5 @@ fun .map('A 'B i:Iter(A) f:[A]B): Iter(B) =
   Option/elim(i.unpack()())
   { . Option/None() }
   { x. Option/Some(f(x)) }
+
+class Type end
