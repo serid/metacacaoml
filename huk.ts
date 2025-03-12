@@ -259,7 +259,7 @@ substitute(ty: any) {
     if (ix === -1)
       ix = findUniqueIndex(this.ctx, x=>
         x.tag === "evar" && x.name === ty.name)
-    assertL(ix !== -1, () => "evar not found" + this.c.errorAt(this.nextIns().span)) // invariant
+    assert(ix !== -1, "evar not found") // invariant
     return this.ctx[ix].solution !== undefined ? this.ctx[ix].solution :
       ty
   case "cons":
@@ -311,9 +311,8 @@ unify_(ty1: any, ty2: any) {
   
   switch (ty1.tag) {
     case "use":
-      assert(ty2.tag === "use" && ty1.name === ty2.name,
-        `error: "${showType(ty1)}" is not a subtype of "${showType(ty2)}"` +
-        this.c.errorAt(0))
+      assertL(ty2.tag === "use" && ty1.name === ty2.name, () =>
+        `error: "${showType(ty1)}" is not a subtype of "${showType(ty2)}"`)
       break
     case "cons":
       assertEq(ty2.tag, "cons")
@@ -365,7 +364,7 @@ infer_() {
     
     // try finding a global
     let gb = this.root.globals[ins.name]
-    if (gb === undefined) error("var not found" + this.c.errorAt(ins.span))
+    if (gb === undefined) error("var not found")
     return this.instantiate(gb.gs, gb.ty)
   case Syntax.array:
     // if array is empty, element type is a fresh evar, otherwise infer
@@ -392,7 +391,7 @@ infer_() {
       let gb = this.root.globals[methodName]
       
       assert(gb !== undefined,
-        "method not found" + this.c.errorAt(ins.span))
+        "method not found")
       fty = this.instantiate(gb.gs, gb.ty)
       assert(fty.domain.length > 0)
       this.unify(receiver, fty.domain[0])
@@ -410,8 +409,7 @@ infer_() {
       let par = fty.domain[i]
       let ins = this.nextIns()
       assertL(ins.tag !== Syntax.endapp, () => "expected argument of type " +
-        showType(par) +
-        this.c.errorAt(ins.span))
+        showType(par))
       // simple application
       if (ins.tag !== Syntax.applam) {
         this.check(par)

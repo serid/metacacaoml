@@ -46,10 +46,6 @@ checkInvariant() {
   assert(this.notPastEof(), "i out of bounds")
 }
 
-errorAt() {
-  return this.compiler.errorAt(this.i)
-}
-
 peekWord(w: string) {
   return isPrefix(this.s, this.i, w)
 }
@@ -68,7 +64,7 @@ tryWord(w: string) {
 }
 
 assertWord(w: string) {
-  assertL(this.tryWord(w), () => `expected "${w}"` + this.errorAt()) 
+  assertL(this.tryWord(w), () => `expected "${w}"`) 
 }
 
 peekChar() {
@@ -129,7 +125,7 @@ ident() {
 
 assertIdent() {
   let id = this.ident()
-  assertL(id !== null, () => "expected ident" + this.errorAt())
+  assert(id !== null, "expected ident")
   return id
 }
 
@@ -274,7 +270,7 @@ expr() {
     return insQueue
   } else {
     let name = this.ident()
-    assertL(name !== null, ()=>"expected expression" + this.errorAt())
+    assert(name !== null, "expected expression")
     insQueue.push({tag: Syntax.use, span, name})
   }
   
@@ -372,7 +368,7 @@ toplevel() {
   
     let arena = this.expr()
     return {tag: Syntax.fun, span, isMethod,name, gs, bs, retT, annots, arena}
-  } else error("expected toplevel" + this.errorAt())
+  } else error("expected toplevel")
 }
 
 *syntax() {

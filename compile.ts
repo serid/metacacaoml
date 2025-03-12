@@ -65,11 +65,7 @@ export class Compiler {
     this.log(lineNumberString + this.src.substring(lineStart, lineEnd))
     this.log(" ".repeat(lineNumberString.length + (e.span - lineStart)) + "^")
   }
-  
-  errorAt(span: number) {
-    return ` at "${this.src.substring(span, span + 20)}"`
-  }
-  
+
   compile() {
     try {
       return this.analyze(new Syntax(this).syntax())
