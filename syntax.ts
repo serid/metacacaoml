@@ -1,5 +1,6 @@
 import { mangle } from './codegen.ts'
-import { error, assert, assertL, assertEq, fuel, nonExhaustiveMatch, getOne, range, last, any } from './util.ts'
+import { CompileError, Compiler } from './compile.ts'
+import { error, assert, assertL, assertEq, fuel, nonExhaustiveMatch, getOne, range, last } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
   if (w.length > s.length - i) return false
@@ -27,11 +28,11 @@ static nakedfun = Symbol("naked-fun")
 static array = Symbol("array")
 static endarray = Symbol("endarray")
 
-compiler: any
+compiler: Compiler
 s: string
 i: number
 
-constructor(compiler: any) {
+constructor(compiler: Compiler) {
   this.compiler = compiler
   this.s = compiler.src
   this.i = 0
@@ -375,10 +376,14 @@ toplevel() {
 }
 
 *syntax() {
+  try{
   this.tryWhitespace()
   while (this.notPastEof()) {
     fuel.step()
     yield this.toplevel()
+  }
+  } catch (e) {
+    throw new CompileError(this.i, undefined, undefined, { cause: e })
   }
 }
 }
