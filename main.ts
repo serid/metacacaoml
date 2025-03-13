@@ -19,6 +19,12 @@ let -check-let2: -check-let1 = 1
 # Matching function Option/elim analyses the object in first parameter and chooses one of lambdas passed to it, while giving it the object's fields
 let -check1: [Option(Int) []String [Int]String] String
   = Option/elim
+
+fun compareTypes(x:Type y:Type): Ordering =
+  x.name().cmp(y.name())
+let -check-sort: make-tuple-type(@[Int String Bool].sorted(compareTypes)) =
+  (Bool/True() 1 "string here")
+
 `, false).compile()
 }
 
