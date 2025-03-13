@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Components Dependency</title>
+</head>
+<body style="background-color:black">
+<svg id="svg" width="500" height="700">
+	<defs>
+		<!-- A marker to be used as an arrowhead -->
+		<marker
+			id="arrow"
+			viewBox="0 0 10 10"
+			refX="10"
+			refY="5"
+			markerWidth="12"
+			markerHeight="12"
+			orient="auto-start-reverse"
+			stroke="white"
+			fill="white">
+			<path d="M 0 0 L 10 5 L 0 10 Q 5 5 0 0" />
+		</marker>
+	</defs>
+	<style>
+		rect {
+			stroke-width:2;
+			stroke:rgb(230,230,230);
+			fill:black
+		}
+		text {
+			fill:white;
+			font:17px sans-serif;
+			text-anchor: middle;
+			dominant-baseline: middle
+		}
+		line {
+			stroke:rgb(230,230,230);
+			marker-end:url(#arrow)
+		}
+	</style>
+</svg>
+<script>
+const phi = 1.618
+
+const boxWidth = 160
+const boxHeight = boxWidth / phi
+const xMargin = 60
+const yMargin = 50
+const xGap = 90
+const yGap = 90
+
+const svg = document.getElementById("svg")
+
+function drawText(x, y, str) {
+	const text = document.createElementNS("http://www.w3.org/2000/svg", "text")
+	text.setAttribute('x', x)
+	text.setAttribute('y', y)
+	text.textContent = str
+	svg.appendChild(text)
+}
+function drawTextBox(x, y, str) {
+	const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
+	rect.setAttribute('x', x)
+	rect.setAttribute('y', y)
+	rect.setAttribute('width', boxWidth)
+	rect.setAttribute('height', boxHeight)
+	svg.appendChild(rect)
+	drawText(x + boxWidth / 2, y + boxHeight / 2, str)
+}
+function drawArrow(x1, y1, x2, y2) {
+	const line = document.createElementNS("http://www.w3.org/2000/svg", "line")
+	line.setAttribute('x1', x1)
+	line.setAttribute('y1', y1)
+	line.setAttribute('x2', x2)
+	line.setAttribute('y2', y2)
+	svg.appendChild(line)
+}
+
+drawTextBox(xMargin, yMargin, "RootCodegen")
+drawTextBox(xMargin + boxWidth + xGap, yMargin, "RootTyck")
+drawTextBox(xMargin, yMargin + boxHeight + yGap, "ItemCodegen")
+drawTextBox(xMargin + boxWidth + xGap, yMargin + boxHeight + yGap, "ItemTyck")
+drawTextBox(185, yMargin + 2*boxHeight +2*yGap, "ItemNetwork")
+
+drawText(xMargin + boxWidth + 0.5*xGap, yMargin + boxHeight + 0.5*yGap, "globals")
+drawArrow(xMargin + boxWidth, yMargin + boxHeight + yGap,
+	xMargin + boxWidth + xGap, yMargin + boxHeight)
+
+drawText(xMargin + 0.5*boxWidth, yMargin + boxHeight + 0.5*yGap, "collect code")
+drawArrow(xMargin + 0.5*boxWidth, yMargin + boxHeight + yGap,
+	xMargin + 0.5*boxWidth, yMargin + boxHeight)
+
+drawText(xMargin + boxWidth + 0.5*xGap,
+	yMargin + boxHeight + yGap + 0.5*boxHeight, "type info")
+drawArrow(xMargin + boxWidth, yMargin + boxHeight + 1.5*yGap,
+	xMargin + boxWidth + xGap, yMargin + boxHeight + 1.5*yGap)
+
+drawText(xMargin + xGap + 1.5*boxWidth,
+	yMargin + boxHeight + 0.5*yGap, "global variables")
+drawArrow(xMargin + xGap + 1.5*boxWidth, yMargin + boxHeight + yGap,
+	xMargin + xGap + 1.5*boxWidth, yMargin + boxHeight)
+
+drawText(xMargin + boxWidth + 1.5*xGap,
+	yMargin + 2*boxHeight + 1.5*yGap, "code to jit compile");
+drawArrow(xMargin + xGap + 1.5*boxWidth, yMargin + yGap + 2.0*boxHeight,
+	185 + 0.5*boxWidth, yMargin + 2.0*boxHeight + 2.0*yGap);
+
+drawText(xMargin + 0.5*boxWidth,
+	yMargin + 2*boxHeight + 1.5*yGap, "code to jit");
+drawArrow(185 + 0.5*boxWidth, yMargin + 2.0*boxHeight + 2.0*yGap,
+	xMargin + 0.5*boxWidth, yMargin + 2.0*boxHeight + yGap);
+</script>
+</body>
+</html>
