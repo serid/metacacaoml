@@ -11,7 +11,7 @@ Its core features:
 | Interfaces | Typeclasses | ❌ |
 | Compilation-time metaprogramming | Templates | ❌ |
 
-For code samples see `./main.ts` and `./memlstd.rs`
+For code samples see `./test.meml.rs` and `./std.meml.rs`
 
 ## The Big Idea
 I find myself compelled by the procedural paradigm where programs are composed of data structures and imperative algorithms mutating them. This paradigm is well-supported among existing languages, which also facilitate higher-order functions — an indispensable tool for encoding abstract algorithms. At the same time, these languages often include effectful features such as exceptions, generator and async functions, which cannot be used inside lambdas, limiting their composition with higher-order functions. For example:

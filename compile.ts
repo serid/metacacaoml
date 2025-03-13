@@ -5,7 +5,7 @@ import { Huk, RootTyck } from "./huk.ts"
 import { ItemCodegen, RootCodegen } from "./codegen.ts"
 import { ItemNetwork } from './flow.ts'
 
-const std = await globalThis.Deno.readTextFile("./memlstd.rs")
+const std = await globalThis.Deno.readTextFile("./std.meml.rs")
 
 export class CompileError extends Error {
   log: string
