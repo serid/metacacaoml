@@ -1,7 +1,8 @@
-import { assertEq, nonExhaustiveMatch, join, ObjectSet, setContains, last, mapInsert, ObjectMap } from './util.ts'
+import { assertEq, nonExhaustiveMatch, join, setContains, mapInsert, ObjectMap } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
-import { CompileError, Compiler } from './compile.ts'
+import { CompileError, ItemCtx } from './compile.ts'
+import { RootTyck } from './huk.ts'
 
 export function mangle(path: string) {
   // hazard: unicode!!
@@ -13,16 +14,19 @@ export function mangle(path: string) {
 }
 
 export class ItemCodegen {
-  c: Compiler
-  root: RootCodegen
+  itemCtx: ItemCtx
+  root: RootCodegen | null
+  rootTyck: RootTyck
   item: any
   k: number // points one past the current instruction
   nextVar: number
   code: string[]
   
-  constructor(root: RootCodegen, item: any) {
-    this.c = root.c
+  constructor(itemCtx: ItemCtx, root: RootCodegen | null, rootTyck: RootTyck,
+    item: any) {
+    this.itemCtx = itemCtx
     this.root = root // toplevel codegen
+    this.rootTyck = rootTyck // toplevel tyck
     this.item = item
     this.k = 0
     this.nextVar = 0
@@ -78,7 +82,7 @@ expr(): string {
     return `${ins.data}`
   case Syntax.use:
     let name = ins.name
-    return setContains(this.c.tyck.globals, name) ?
+    return setContains(this.rootTyck.globals, name) ?
       "_fixtures_."+name : name
   case Syntax.array: {
     let ixs: string[] = []
@@ -96,7 +100,7 @@ expr(): string {
     // For methods, fetch full name produced by tyck, otherwise the fun is first expression
     //write(ins)
     let fun = ins.metName !== null ?
-      "_fixtures_."+this.c.itemTyck.getMethodNameAt(insLocation) :
+      "_fixtures_."+this.itemCtx.tyck.getMethodNameAt(insLocation) :
       ixs.shift()
     
     // A contrived codegen spell indeed
@@ -182,7 +186,7 @@ codegenUncached(): ObjectMap<string> {
     let retIx2 = this.expr()
     
     this.code.push(`  return ${retIx2}\n})`)
-    mapInsert(toplevels, this.c.itemTyck.funName, this.unshiftCode())
+    mapInsert(toplevels, this.itemCtx.tyck.funName, this.unshiftCode())
     break
   case Syntax.nakedfun:
     this.code.push(`  return ${this.expr()}`)
@@ -199,7 +203,7 @@ codegenUncached(): ObjectMap<string> {
 }
 
 codegen(): ObjectMap<string> {
-  return this.c.itemNetwork.memoize(
+  return this.itemCtx.network.memoize(
     "codegen-item", [], this.codegenUncached.bind(this))
 }
 
@@ -223,10 +227,6 @@ export class RootCodegen {
     ]
   }
   
-  getItemCodegen(item: any) {
-    return new ItemCodegen(this, item)
-  }
-
   getCode(): string {
     this.code.push(`_fixtures_.main().next()`)
     return this.code.join("")

@@ -3,7 +3,7 @@ import { assert, range, toString, write } from './util.ts'
 import { Syntax } from "./syntax.ts"
 import { Huk, RootTyck } from "./huk.ts"
 import { ItemCodegen, RootCodegen } from "./codegen.ts"
-import { Network } from './flow.ts'
+import { ItemNetwork } from './flow.ts'
 
 const std = await globalThis.Deno.readTextFile("./memlstd.rs")
 
@@ -19,30 +19,55 @@ export class CompileError extends Error {
   }
 }
 
+export class ItemCtx {
+  // reference to item itself is stored in each component
+  // because pointer jumping
+  tyck: Huk
+  cg: ItemCodegen
+  network: ItemNetwork
+
+  constructor(network: ItemNetwork) {
+    this.tyck = null
+    this.cg = null
+    this.network = network
+  }
+
+  init(tyck: RootTyck, cg: RootCodegen | null, item: any) {
+    this.tyck = new Huk(this, tyck, item)
+    this.cg = new ItemCodegen(this, cg, tyck, item)
+  }
+
+  reset() {
+    this.tyck = null
+    this.cg = null
+    this.network.resetCache()
+  }
+}
+
 export class Compiler {
   src: string
   logging: boolean
   logs: string[]
   tyck: RootTyck
-  itemTyck: Huk
   cg: RootCodegen
-  itemCg: ItemCodegen
-  itemNetwork: Network
+  itemCtx: ItemCtx
 
   constructor(src: string, logging: boolean) {
     this.src = std + src
     this.logging = logging
     this.logs = []
     this.tyck = new RootTyck(this)
-    this.itemTyck = <Huk><unknown>null
     this.cg = new RootCodegen(this)
-    this.itemCg = <ItemCodegen><unknown>null
-    this.itemNetwork = new Network([
-      "codegen-item",
-    ])
+    this.itemCtx = new ItemCtx(Compiler.makeItemNetwork())
 
     //this.tyck.initializeDucts(this.itemNetwork)
     //this.cg.initializeDucts(this.itemNetwork)
+  }
+
+  static makeItemNetwork()  {
+    return new ItemNetwork([
+      "codegen-item",
+    ])
   }
   
   log(...xs: any[]) {
@@ -78,12 +103,11 @@ export class Compiler {
   analyze(items: Iterable<any>) {
     try {
       for (let item of items) {
-        this.itemTyck = this.tyck.getItemTyck(item)
-        this.itemCg = this.cg.getItemCodegen(item)
-        this.itemTyck.tyck()
-        this.itemCg.step()
+        this.itemCtx.init(this.tyck, this.cg, item)
+        this.itemCtx.tyck.tyck()
+        this.itemCtx.cg.step()
       
-        this.itemNetwork.resetCache()
+        this.itemCtx.reset()
       }
   
       console.log(`normalizations count: ` + this.tyck.normalCounter)

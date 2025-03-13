@@ -6,7 +6,7 @@ function argsToString(args: string[]) {
   return args.join(":")
 }
 
-export class Network {
+export class ItemNetwork {
   paths: string[]
   //ducts: ObjectMap<(..._: string[]) => any>
   cache: ObjectMap<ObjectMap<any>>

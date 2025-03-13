@@ -1,7 +1,7 @@
 import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapGet, LateInit, range, prettyPrint, mapRemove, mapFilterMapProjection } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
-import { CompileError, Compiler } from './compile.ts'
+import { CompileError, Compiler, ItemCtx } from './compile.ts'
 
 function showType(ty: any) {
   if (ty===undefined||ty===null) return String(ty)
@@ -33,7 +33,7 @@ function mkEUse(name: string) {
 
 // The item typechecker, named after Yenisei
 export class Huk {
-  c: Compiler
+  itemCtx: ItemCtx
   root: RootTyck
   item: any
   k: number
@@ -46,8 +46,8 @@ export class Huk {
   methodNameAt: ObjectMap<string>
   funName: string
 
-  constructor(root: RootTyck, item: any) {
-    this.c = root.c // compiler
+  constructor(itemCtx: ItemCtx, root: RootTyck, item: any) {
+    this.itemCtx = itemCtx
     this.root = root // toplevel tycker
 
     // item-local state
@@ -160,7 +160,9 @@ normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
   let paramNames = envv.map(x=>x[0])
   let args = envv.map(x=>x[1])
   
-  let cgs = this.c.cg.getItemCodegen(tyExpr).codegenUncached()
+  let nakedCtx = new ItemCtx(Compiler.makeItemNetwork())
+  nakedCtx.init(this.root, null, tyExpr)
+  let cgs = nakedCtx.cg.codegenUncached()
   assertEq(Object.keys(cgs), ["_"])
   let obj = `"use strict";\n` + cgs._
   
@@ -515,7 +517,7 @@ tyck() {
     }))
 
     // codegen constructors and eliminator
-    let conssCode = this.c.itemCg.codegen()
+    let conssCode = this.itemCtx.cg.codegen()
     let conssFuns = mapFilterMapProjection(conssCode,
       (_name, code) => this.jitCompile(code)
     )
@@ -550,7 +552,7 @@ tyck() {
     let ty = this.normalize(item.retT)
     this.check(ty)
 
-    let cgs = this.c.itemCg.codegen()
+    let cgs = this.itemCtx.cg.codegen()
     assertEq(Object.keys(cgs), [item.name])
 
     mapInsert(this.root.globals, item.name, {
@@ -609,7 +611,7 @@ tyck() {
       }
     }
 
-    let cgs = this.c.itemCg.codegen()
+    let cgs = this.itemCtx.cg.codegen()
     assertEq(Object.keys(cgs), [name])
 
     // fill-in the fixture
@@ -650,10 +652,6 @@ export class RootTyck {
       return entry.value.get()
     })
     this.normalCounter = 0
-  }
-  
-  getItemTyck(item: any) {
-    return new Huk(this, item)
   }
 
   /*
