@@ -162,6 +162,10 @@ normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
   
   let nakedCtx = new ItemCtx(Compiler.makeItemNetwork())
   nakedCtx.init(this.root, null, tyExpr)
+
+  //kinda hacky idk
+  nakedCtx.tyck.ctx = [...this.ctx]
+  nakedCtx.tyck.tyck()
   let cgs = nakedCtx.cg.codegenUncached()
   assertEq(Object.keys(cgs), ["_"])
   let obj = `"use strict";\n` + cgs._
@@ -358,6 +362,10 @@ infer_() {
   case Syntax.int:
     return {tag:"cons", name:"Int", args:[]}
   case Syntax.use:
+    // try finding a uni
+    if (this.ctx.findLastIndex(x=>
+      x.tag === "uni" && x.name === ins.name) !== -1)
+      return useType
     // try finding a local
     let ix = this.ctx.findLastIndex(x=>
       x.tag === "var" && x.name === ins.name)
@@ -452,6 +460,11 @@ infer_() {
 
     assertEq(this.stepIns().tag, Syntax.endapp) // invariant
     return this.substitute(fty.codomain)
+  
+  // Types
+  case Syntax.any:
+  case Syntax.arrow:
+    return useType
   default:
     nonExhaustiveMatch(ins.tag)
   }
@@ -475,6 +488,9 @@ check(ty: any) {
   case Syntax.array:
   case Syntax.use:
   case Syntax.app:
+  // Types
+  case Syntax.any:
+  case Syntax.arrow:
     this.k--
     let ty2 = this.infer()
     //this.c.log("inferred for check", ty2)
@@ -622,6 +638,11 @@ tyck() {
     // check if all evars are solved? no
     //assert(this.ctx.)
     //if (this.c.logging) write(`fun ${name} analysis time`, performance.now()-beforeFun)
+    break
+
+  // When checking a type annotation
+  case Syntax.nakedfun:
+    this.check(useType)
     break
   default:
     nonExhaustiveMatch(item.tag)
