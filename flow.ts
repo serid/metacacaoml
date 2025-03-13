@@ -22,7 +22,7 @@ export class ItemNetwork {
     // note: this reactivity style requires `duct` closure
     // to be allocated on every call, in contrast to `register` style
 
-    write(`> ${path}(${join(args)})`)
+    // write(`> ${path}(${join(args)})`)
     let column = mapGet(this.cache, path)
     let key = argsToString(args)
     let value = column[key]

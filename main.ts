@@ -4,7 +4,7 @@ import { write } from './util.ts'
 async function main() {
   let t = performance.now()
   let src = await globalThis.Deno.readTextFile("./test.meml.rs")
-  let obj = new Compiler(src, false).compile()
+  let obj = new Compiler(src, true).compile()
 
   // write(`Obj: ${obj}`)
   // write(`Src: ${src}\n`)

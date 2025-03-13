@@ -71,13 +71,14 @@ export class Compiler {
   }
   
   log(...xs: any[]) {
+    if (!this.logging) return
     write(...xs)
     for (let x of xs) this.logs.push(toString(x), " ")
     this.logs.push("\n\n")
   }
 
   reportError(e: CompileError) {
-    this.log(e.log)
+    write(e.log)
 
     let lineNumber = 0
     for (let i of range(e.span)) if (this.src[i] === "\n") lineNumber++
@@ -87,8 +88,8 @@ export class Compiler {
     let lineStart = this.src.lastIndexOf("\n", e.span) + 1
     let lineEnd = this.src.indexOf("\n", e.span)
     if (lineEnd === -1) lineEnd = this.src.length
-    this.log(lineNumberString + this.src.substring(lineStart, lineEnd))
-    this.log(" ".repeat(lineNumberString.length + (e.span - lineStart)) + "^")
+    write(lineNumberString + this.src.substring(lineStart, lineEnd))
+    write(" ".repeat(lineNumberString.length + (e.span - lineStart)) + "^")
   }
 
   compile() {
@@ -110,7 +111,7 @@ export class Compiler {
         this.itemCtx.reset()
       }
   
-      console.log(`normalizations count: ` + this.tyck.normalCounter)
+      this.log(`normalizations count: ` + this.tyck.normalCounter)
       return this.cg.getCode()
     } catch (e) {
       if (e.constructor !== CompileError) throw e
