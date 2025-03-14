@@ -1,9 +1,9 @@
 {
-  "compilerOptions": {
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "module": "Preserve",
-    "target": "ESNext",
-    "lib": ["DOM", "ES2023"]
-  }
+	"compilerOptions": {
+		"allowImportingTsExtensions": true,
+		"noEmit": true,
+		"module": "Preserve",
+		"target": "ESNext",
+		"lib": ["DOM", "ES2023"]
+	}
 }
