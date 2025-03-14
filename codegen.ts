@@ -1,7 +1,7 @@
 import { assertEq, nonExhaustiveMatch, join, setContains, mapInsert, ObjectMap } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
-import { CompileError, ItemCtx } from './compile.ts'
+import { CompileError, Compiler, ItemCtx } from './compile.ts'
 import { RootTyck } from './huk.ts'
 
 export function mangle(path: string) {
@@ -98,7 +98,6 @@ expr(): string {
 			ixs.push(this.expr())
 
 		// For methods, fetch full name produced by tyck, otherwise the fun is first expression
-		//write(ins)
 		let fun = ins.metName !== null ?
 			"_fixtures_."+this.itemCtx.tyck.getMethodNameAt(insLocation) :
 			ixs.shift()
@@ -149,7 +148,6 @@ codegenUncached(): ObjectMap<string> {
 	let item = this.item
 	let toplevels: ObjectMap<string> = Object.create(null)
 
-	//write("cg", ins)
 	switch (item.tag) {
 	case Syntax.cls:
 		let elimCode = []
@@ -216,11 +214,11 @@ step() {
 }
 
 export class RootCodegen {
-	c: any
+	c: Compiler
 	code: string[]
 
-	constructor(c: any) {
-		this.c = c // compiler
+	constructor(compiler: Compiler) {
+		this.c = compiler
 		this.code = [
 			`"use strict";\n`,
 			`const _fixtures_ = Object.create(null)\n`
@@ -231,12 +229,4 @@ export class RootCodegen {
 		this.code.push(`_fixtures_.main().next()`)
 		return this.code.join("")
 	}
-
-	/*
-	initializeDucts(network: Network) {
-		network.register("codegen-type-constructor", () => {
-			error("")
-		})
-	}
-	*/
 }

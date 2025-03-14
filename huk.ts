@@ -59,7 +59,6 @@ constructor(itemCtx: ItemCtx, root: RootTyck, item: any) {
 	this.log = []
 
 	// Codegen will be querying the methodname
-	// Map<int, string>
 	this.methodNameAt = Object.create(null)
 	this.funName = null
 }
@@ -147,7 +146,6 @@ normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
 	try {
 	assertEq(tyExpr.tag, Syntax.nakedfun)
 
-	//this.c.log("normalize", tyExpr)
 	this.root.normalCounter++
 	// prepare environment (it will be passed in params)
 	let env = Object.create(null)
@@ -173,7 +171,6 @@ normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
 	try {
 		let g = new GeneratorFunction(...paramNames, obj)(...args)
 		let normalized = nextLast(g)
-		//this.c.log("normalized:", normalized)
 		return normalized
 	} catch (e) {
 		let log = `Env: ${prettyPrint(env)}\n` +
@@ -212,7 +209,6 @@ allocEVar(hint: string) {
 instantiate(vars: string[], ty: any) {
 	this.enterTyping(`|- inst(${prettyPrint(vars)}, ${showType(ty)})`)
 
-	//this.c.log("inst", ty)
 	// generate fresh evar names
 	let mapp = Object.create(null)
 	let taken = this.getTakenEVarNames()
@@ -225,7 +221,6 @@ instantiate(vars: string[], ty: any) {
 }
 
 static instantiate0(varMap: ObjectMap<string>, ty: any) {
-	//this.c.log("instantiate0", varMap, ty)
 	switch (ty.tag) {
 	case "cons":
 		return {tag: "cons",
@@ -252,7 +247,6 @@ static instantiate0(varMap: ObjectMap<string>, ty: any) {
 // bidir.pdf: [Г]A
 substitute(ty: any) {
 	//this.addTyping(`[${this.showCtx()}]${showType(ty)}`)
-	//this.c.log(showType(ty))
 	switch (ty.tag) {
 	case "any":
 	case "use":
@@ -285,7 +279,6 @@ substitute(ty: any) {
 
 solveEvarTo(name: string, solution: any) {
 	this.addTyping(`|- ?${name} <:= ${showType(solution)}`)
-	//this.c.log("solve evar", name, solution)
 	assert(!this.ctx.some(
 		x => x.tag === "esolve" && x.name === name),
 		"evar already solved") // invariant
@@ -298,8 +291,6 @@ solveEvarTo(name: string, solution: any) {
 }
 
 unify_(ty1: any, ty2: any) {
-	/*write("unify", showType(ty1),
-		showType(ty2), this.ctx)*/
 	if (ty1.tag === "euse" &&
 		ty2.tag === "euse" &&
 		ty1.name === ty2.name)
@@ -364,7 +355,6 @@ unifyUi(ty1: any, ty2: any) {
 infer_() {
 	let insLocation = this.k
 	let ins = this.stepIns()
-	//this.c.log("infer", ins, this.ctx)
 	switch (ins.tag) {
 	case Syntax.strlit:
 		return {tag:"cons", name:"String", args:[]}
@@ -417,7 +407,7 @@ infer_() {
 			assert(fty.domain.length > 0)
 			this.unifyUi(receiver, fty.domain[0])
 		}
-		//this.c.log("fty", showType(fty))
+
 		assertEq(fty.tag, "arrow") //todo evar
 
 		for (let i of range(isMethod?1:0, fty.domain.length)) {
@@ -425,7 +415,6 @@ infer_() {
 			// this is necessary since context grows in information as we check arguments
 			// todo: performance: only substitute remaining arguments
 			fty = this.substitute(fty)
-			//this.c.log("new fty", showType(fty), this.ctx)
 
 			let par = fty.domain[i]
 			let ins = this.nextIns()
@@ -496,7 +485,6 @@ infer() {
 check(ty: any) {
 	try {
 	let ins = this.stepIns()
-	//this.c.log("check", ins, showType(ty))
 	switch (ins.tag) {
 	case Syntax.native:
 		return
@@ -510,7 +498,6 @@ check(ty: any) {
 	case Syntax.arrow:
 		this.k--
 		let ty2 = this.infer()
-		//this.c.log("inferred for check", ty2)
 		this.unifyUi(this.substitute(ty2),
 			this.substitute(ty))
 		return
@@ -600,7 +587,6 @@ tyck() {
 		break
 	}
 	case Syntax.fun:
-		//let beforeFun = performance.now()
 		assert(item.annots.length <= 1)
 
 		// normalize the function type
@@ -652,10 +638,6 @@ tyck() {
 		mapGet(this.root.globals, name).value.set(
 			this.jitCompile(cgs[name])
 		)
-
-		// check if all evars are solved? no
-		//assert(this.ctx.)
-		//if (this.c.logging) write(`fun ${name} analysis time`, performance.now()-beforeFun)
 		break
 
 	// When checking a type annotation
@@ -673,16 +655,15 @@ tyck() {
 }
 
 export class RootTyck {
-	c: any
+	c: Compiler
 	globals: ObjectMap<{gs: string[], ty: any, value: LateInit<any>}>
 	fixtures: ObjectMap<any>
 	normalCounter: number
 
-	constructor(c: any) {
-		this.c = c // compiler
+	constructor(compiler: Compiler) {
+		this.c = compiler
 		// A fixture is a value or a function present at compilation time. C++ calls this constexpr and in Zig it's comptime
 		// types and fixture values of global declarations
-		// Map<string, {ty, value}>
 		let globals: ObjectMap<{gs: string[], ty: any, value: LateInit<any>}> =
 			Object.create(null)
 		this.globals = globals
@@ -692,12 +673,4 @@ export class RootTyck {
 		})
 		this.normalCounter = 0
 	}
-
-	/*
-	initializeDucts(network: Network) {
-		network.register("method-name-at", (insLocation) => {
-			return mapGet(this.c.itemTyck.methodNameAt, insLocation)
-		})
-	}
-	*/
 }

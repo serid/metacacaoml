@@ -23,6 +23,6 @@ let -tuple-of-stuffs: make-tuple-type(@[Int String Bool].sorted(compareTypes)) =
 fun main(): Unit =
 let(@[1 2 3]) λarray.
 let(write(array)) λ-.
-let(Array/to-iter(array)) λiterator.
+let(Array/to-Iter(array)) λiterator.
 let(iterator.map(Int/increment)) λincremented.
-write(incremented.to-array())
+write(incremented.to-Array())

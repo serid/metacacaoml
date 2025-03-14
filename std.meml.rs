@@ -20,7 +20,7 @@ class Bool
 | False()
 | True()
 end
-fun bool-from-native(b:@any): Bool =
+fun Bool/from-native(b:@any): Bool =
 	native[|b?yield*_fixtures_.BoolᐅTrue():yield*_fixtures_.BoolᐅFalse()|]
 fun .then('A b: Bool onTrue: []A onFalse: []A): A =
 	Bool/elim(b onFalse onTrue)
@@ -37,8 +37,8 @@ fun Ordering/from-lt-eq('A lt:[A A]Bool eq:[A A]Bool): [A A]Ordering =
 
 class Int end
 fun .increment(x:Int): Int = native[|x+1|]
-fun .lt(x:Int y:Int): Bool = bool-from-native(native[|x<y|])
-fun .eq(x:Int y:Int): Bool = bool-from-native(native[|x===y|])
+fun .lt(x:Int y:Int): Bool = Bool/from-native(native[|x<y|])
+fun .eq(x:Int y:Int): Bool = Bool/from-native(native[|x===y|])
 let Int/cmp: [Int Int]Ordering = Ordering/from-lt-eq(Int/lt Int/eq)
 fun .add(x:Int y:Int): Int = native[|x+y|]
 fun .sub(x:Int y:Int): Int = native[|x-y|]
@@ -51,8 +51,8 @@ fun .to-Int(ord:Ordering): Int =
 	Ordering/elim(ord) {. -1} {. 0} {. 1}
 
 class String end
-fun .lt(x:String y:String): Bool = bool-from-native(native[|x<y|])
-fun .eq(x:String y:String): Bool = bool-from-native(native[|x===y|])
+fun .lt(x:String y:String): Bool = Bool/from-native(native[|x<y|])
+fun .eq(x:String y:String): Bool = Bool/from-native(native[|x===y|])
 let String/cmp: [String String]Ordering =
 	Ordering/from-lt-eq(String/lt String/eq)
 
@@ -129,13 +129,13 @@ fun .unpack('A i:Iter(A)): []Option(A) =
 fun .for-each('A i:Iter(A) f:[A]Unit): Unit = Option/elim(i.unpack()())
 	{ . Unit/C() }
 	{ x. and(f(x) i.for-each(f)) }
-fun .to-array('A i:Iter(A)): Array(A) =
+fun .to-Array('A i:Iter(A)): Array(A) =
 	let(@[]) λ xs.
 	let(i.for-each() λ x.
 		xs.push(x)
 	) λ -.
 	xs
-fun .to-iter('A xs:Array(A)): Iter(A) =
+fun .to-Iter('A xs:Array(A)): Iter(A) =
 	let(Box/New(0)) λ i.
 	Iter/New() λ .
 	let(i.get()) λ iv.
@@ -156,6 +156,6 @@ fun make-tuple-type(ts: Array(Type)): Type =
 	Pair/elim(ts.unsnoc().unwrap()) λ init last.
 	let(init.reverse()) λ -.
 	let(Box/New(last)) λ acc.
-	let(init.to-iter().for-each()
+	let(init.to-Iter().for-each()
 		{ t. acc.modify() λ x. Pair(t x) }) λ -.
 	acc.get()

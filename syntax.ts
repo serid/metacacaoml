@@ -1,6 +1,6 @@
 import { mangle } from './codegen.ts'
 import { CompileError, Compiler } from './compile.ts'
-import { error, assert, assertL, assertEq, fuel, nonExhaustiveMatch, getOne, range, last } from './util.ts'
+import { error, assert, assertL, fuel, range, last } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
 	if (w.length > s.length - i) return false
@@ -136,41 +136,6 @@ stringLiteral(end: string) {
 	return s
 }
 
-#normalize(es: Generator<any, void, void>) {
-	let ins = getOne(es)
-	//write(ins)
-	switch (ins.tag) {
-	case Syntax.any:
-		return {tag:"any", span:ins.span}
-	case Syntax.use:
-		return {tag:"use", span:ins.span, name:ins.name}
-	case Syntax.app:
-		let cons = this.#normalize(es)
-		let args = []
-		while (true) {
-			let arg = this.#normalize(es)
-			if (arg === null) break
-			args.push(arg)
-		}
-		assertEq(cons.tag, "use")
-		return {tag:"cons", name:cons.name, args}
-	case Syntax.arrow:
-		let domain = []
-		while (true) {
-			let ty = this.#normalize(es)
-			if (ty === null) break
-			domain.push(ty)
-		}
-		let codomain = this.#normalize(es)
-		return {tag:"arrow", domain, codomain}
-	case Syntax.endapp:
-	case Syntax.endarrow:
-		return null
-	default:
-		nonExhaustiveMatch(ins.tag)
-	}
-}
-
 type() {
 	return {tag: Syntax.nakedfun,
 		span: this.i,
@@ -211,7 +176,7 @@ bindings() {
 }
 
 // returns an array of instructions
-expr() {
+expr(): any[] {
 	let span = this.i
 	let insQueue = []
 	if (this.tryWord('"')) {
@@ -371,7 +336,7 @@ toplevel() {
 }
 
 *syntax() {
-	try{
+	try {
 	this.tryWhitespace()
 	while (this.notPastEof()) {
 		fuel.step()

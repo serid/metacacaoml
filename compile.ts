@@ -59,12 +59,9 @@ constructor(src: string, logging: boolean) {
 	this.tyck = new RootTyck(this)
 	this.cg = new RootCodegen(this)
 	this.itemCtx = new ItemCtx(Compiler.makeItemNetwork())
-
-	//this.tyck.initializeDucts(this.itemNetwork)
-	//this.cg.initializeDucts(this.itemNetwork)
 }
 
-static makeItemNetwork()  {
+static makeItemNetwork() {
 	return new ItemNetwork([
 		"codegen-item",
 	])
@@ -93,12 +90,7 @@ reportError(e: CompileError) {
 }
 
 compile() {
-	try {
-		return this.analyze(new Syntax(this).syntax())
-	} catch (e) {
-		//console.log(this.logs)
-		throw e
-	}
+	return this.analyze(new Syntax(this).syntax())
 }
 
 analyze(items: Iterable<any>) {
@@ -115,7 +107,6 @@ analyze(items: Iterable<any>) {
 		return this.cg.getCode()
 	} catch (e) {
 		if (e.constructor !== CompileError) throw e
-		// this.log("analyze", item)
 		this.reportError(e)
 		assert(e.cause!==undefined, "expected cause")
 		throw e.cause
