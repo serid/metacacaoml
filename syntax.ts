@@ -81,9 +81,10 @@ tryComment() {
 	while (true) {
 	if (this.tryWord("#{")) {
 		while (this.notPastEof() && this.peekChar() !== '}') {
-			// todo: might be suboptimal
-			this.tryComment()
-			this.i++
+			if (this.peekChar() === '#')
+				this.tryComment()
+			else
+				this.i++
 		}
 		this.i++
 	} else if (this.tryWord("#")) {
