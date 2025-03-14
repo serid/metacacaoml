@@ -317,8 +317,7 @@ unify_(ty1: any, ty2: any) {
   
   switch (ty1.tag) {
     case "use":
-      assertL(ty2.tag === "use" && ty1.name === ty2.name, () =>
-        `error: "${showType(ty1)}" is not a subtype of "${showType(ty2)}"`)
+      assert(ty2.tag === "use" && ty1.name === ty2.name)
       break
     case "cons":
       assertEq(ty2.tag, "cons")
@@ -348,6 +347,18 @@ unify(ty1: any, ty2: any) {
   this.enterTyping(`|- ${showType(ty1)} <: ${showType(ty2)}`)
   this.unify_(ty1, ty2)
   this.exitTyping(`-| ${showType(ty1)} <: ${showType(ty2)}`)
+}
+
+unifyUi(ty1: any, ty2: any) {
+  try {
+    this.unify(ty1, ty2)
+  } catch (e) {
+    assert(e.constructor !== CompileError)
+    e.message = `error: \`${showType(ty1)}' is not a subtype of \`${showType(ty2)}'`
+    throw new CompileError(this.ins().span, this.log.join("\n"),
+      undefined,
+      { cause: e })
+  }
 }
 
 infer_() {
@@ -404,7 +415,7 @@ infer_() {
         "method not found")
       fty = this.instantiate(gb.gs, gb.ty)
       assert(fty.domain.length > 0)
-      this.unify(receiver, fty.domain[0])
+      this.unifyUi(receiver, fty.domain[0])
     }
     //this.c.log("fty", showType(fty))
     assertEq(fty.tag, "arrow") //todo evar
@@ -471,13 +482,19 @@ infer_() {
 }
 
 infer() {
-  this.enterTyping(`|- _ => ?`)
-  let ty = this.infer_()
-  this.exitTyping(`-| _ => ${showType(ty)}`)
-  return ty
+  try {
+    this.enterTyping(`|- _ => ?`)
+    let ty = this.infer_()
+    this.exitTyping(`-| _ => ${showType(ty)}`)
+    return ty
+  } catch (e) {
+    if (e.constructor === CompileError) throw e
+    throw new CompileError(this.ins().span, this.log.join("\n"), undefined, { cause: e })
+  }
 }
 
 check(ty: any) {
+  try {
   let ins = this.stepIns()
   //this.c.log("check", ins, showType(ty))
   switch (ins.tag) {
@@ -494,11 +511,15 @@ check(ty: any) {
     this.k--
     let ty2 = this.infer()
     //this.c.log("inferred for check", ty2)
-    this.unify(this.substitute(ty2),
+    this.unifyUi(this.substitute(ty2),
       this.substitute(ty))
     return
   default:
     nonExhaustiveMatch(ins.tag)
+  }
+  } catch (e) {
+    if (e.constructor === CompileError) throw e
+    throw new CompileError(this.ins().span, this.log.join("\n"), undefined, { cause: e })
   }
 }
   
@@ -609,17 +630,14 @@ tyck() {
     })
 
     if (item.annots.length === 0)
-      try {
-        this.check(codomain)
-      } catch (e) {
-        throw new CompileError(this.ins().span, this.log.join("\n"), undefined, { cause: e })
-      }
+      this.check(codomain)
     else {
       let expected = item.annots[0].text
       try {
         this.check(codomain)
         error("expected error: "+expected)
       } catch (e) {
+        while (e.cause !== undefined) e = e.cause
         assertEq(e.message, expected)
 
         mapRemove(this.root.globals, name)

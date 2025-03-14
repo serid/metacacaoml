@@ -1,5 +1,5 @@
 fun foo(): String = ""
-@Fails(error: "A" is not a subtype of "B")
+@Fails(error: `A' is not a subtype of `B')
 fun f('A 'B x:A): B = x
 
 let -check-id: id(Int) = 1

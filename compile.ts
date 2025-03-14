@@ -78,7 +78,7 @@ export class Compiler {
   }
 
   reportError(e: CompileError) {
-    write(e.log)
+    if (this.logging) write(e.log)
 
     let lineNumber = 0
     for (let i of range(e.span)) if (this.src[i] === "\n") lineNumber++
