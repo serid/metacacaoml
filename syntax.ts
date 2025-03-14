@@ -96,8 +96,7 @@ tryComment() {
 tryWhitespace() {
   while (this.notPastEof()) {
     this.tryComment()
-    if (this.peekChar() !== ' ' &&
-      this.peekChar() !== '\n')
+    if (/\S/.test(this.peekChar()))
       break
     this.i++
   }
