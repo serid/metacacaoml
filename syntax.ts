@@ -105,17 +105,15 @@ tryWhitespace() {
 }
 
 ident() {
-	let rule = /[a-zA-Z0-9\-]/
+	let anlautRule = /[a-zA-Z\-]/
+	let inlautRule = /[a-zA-Z0-9\-/]/
 	let id = ""
 	if (!this.notPastEof() ||
-		!rule.test(this.peekChar()))
+		!anlautRule.test(this.peekChar()))
 		return null
 	while (this.notPastEof()) {
-		if (this.tryWord("/"))
-			id += "/"
-
 		let c = this.peekChar()
-		if (!rule.test(c))
+		if (!inlautRule.test(c))
 			break
 		id += c
 		this.i++
