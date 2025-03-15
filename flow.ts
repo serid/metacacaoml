@@ -7,12 +7,9 @@ function argsToString(args: string[]) {
 }
 
 export class ItemNetwork {
-	paths: string[]
-	cache: ObjectMap<ObjectMap<any>>
+	private cache: ObjectMap<ObjectMap<any>> = Object.create(null)
 
-	constructor(paths: string[]) {
-		this.paths = paths
-		this.cache = Object.create(null)
+	constructor(private paths: string[]) {
 		this.resetCache()
 	}
 

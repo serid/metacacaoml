@@ -33,35 +33,21 @@ function mkEUse(name: string) {
 
 // The item typechecker, named after Yenisei
 export class Huk {
-itemCtx: ItemCtx
-root: RootTyck
-item: any
-k: number
-ctx: any[]
+private k: number = 0
+private ctx: any[] = []
 
 // log of typing judgements applied
-depth: number
-log: string[]
+private depth: number = 0
+private log: string[] = []
 
-methodNameAt: ObjectMap<string>
-funName: string
+// Codegen will be querying the methodname
+private methodNameAt: ObjectMap<string> = Object.create(null)
+private funName: string = null
 
-constructor(itemCtx: ItemCtx, root: RootTyck, item: any) {
-	this.itemCtx = itemCtx
-	this.root = root // toplevel tycker
-
-	// item-local state
-	this.item = item
-	this.k = 0
-	this.ctx = []
-
-	this.depth = 0
-	this.log = []
-
-	// Codegen will be querying the methodname
-	this.methodNameAt = Object.create(null)
-	this.funName = null
-}
+constructor(
+	private itemCtx: ItemCtx,
+	private root: RootTyck, // toplevel tycker
+	private item: any) {}
 
 ins() {
 	return this.item.arena[Math.max(this.k-1, 0)]
@@ -655,22 +641,14 @@ tyck() {
 }
 
 export class RootTyck {
-	c: Compiler
-	globals: ObjectMap<{gs: string[], ty: any, value: LateInit<any>}>
-	fixtures: ObjectMap<any>
-	normalCounter: number
-
-	constructor(compiler: Compiler) {
-		this.c = compiler
-		// A fixture is a value or a function present at compilation time. C++ calls this constexpr and in Zig it's comptime
-		// types and fixture values of global declarations
-		let globals: ObjectMap<{gs: string[], ty: any, value: LateInit<any>}> =
-			Object.create(null)
-		this.globals = globals
-		this.fixtures = mapFilterMapProjection(this.globals, (_name, entry) => {
+	// A fixture is a value or a function present at compilation time. C++ calls this constexpr and in Zig it's comptime
+	// types and fixture values of global declarations
+	globals: ObjectMap<{gs: string[], ty: any, value: LateInit<any>}> =
+		Object.create(null)
+	fixtures: ObjectMap<any> = mapFilterMapProjection(this.globals,
+		(_name, entry) => {
 			if (entry.value === null) return null
 			return entry.value.get()
 		})
-		this.normalCounter = 0
-	}
+	normalCounter: number = 0
 }

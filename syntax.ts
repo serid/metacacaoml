@@ -28,15 +28,9 @@ static nakedfun = Symbol("naked-fun")
 static array = Symbol("array")
 static endarray = Symbol("endarray")
 
-compiler: Compiler
-s: string
-i: number
+private i: number = 0
 
-constructor(compiler: Compiler) {
-	this.compiler = compiler
-	this.s = compiler.src
-	this.i = 0
-}
+constructor(private s: string) {}
 
 notPastEof() {
 	return this.i < this.s.length

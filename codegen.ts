@@ -14,24 +14,15 @@ export function mangle(path: string) {
 }
 
 export class ItemCodegen {
-itemCtx: ItemCtx
-root: RootCodegen | null
-rootTyck: RootTyck
-item: any
-k: number // points one past the current instruction
-nextVar: number
-code: string[]
+private k: number = 0 // points one past the current instruction
+private nextVar: number = 0
+private code: string[] = []
 
-constructor(itemCtx: ItemCtx, root: RootCodegen | null, rootTyck: RootTyck,
-	item: any) {
-	this.itemCtx = itemCtx
-	this.root = root // toplevel codegen
-	this.rootTyck = rootTyck // toplevel tyck
-	this.item = item
-	this.k = 0
-	this.nextVar = 0
-	this.code = []
-}
+constructor(
+	private itemCtx: ItemCtx,
+	private root: RootCodegen | null, // toplevel codegen
+	private rootTyck: RootTyck, // toplevel tyck
+	private item: any) {}
 
 ins() {
 	return this.item.arena[Math.max(this.k-1, 0)]
@@ -184,7 +175,7 @@ codegenUncached(): ObjectMap<string> {
 		let retIx2 = this.expr()
 
 		this.code.push(`  return ${retIx2}\n})`)
-		mapInsert(toplevels, this.itemCtx.tyck.funName, this.unshiftCode())
+		mapInsert(toplevels, this.itemCtx.tyck.getFunName(), this.unshiftCode())
 		break
 	case Syntax.nakedfun:
 		this.code.push(`  return ${this.expr()}`)
@@ -209,20 +200,18 @@ step() {
 	let cgs = this.codegen()
 	let aToplevel = Object.entries(cgs).flatMap(
 		([name, code]) => ["_fixtures_.", name, " = ", code, "\n"]).join("")
-	this.root.code.push(aToplevel)
+	this.root.push(aToplevel)
 }
 }
 
 export class RootCodegen {
-	c: Compiler
-	code: string[]
+	private code: string[] = [
+		`"use strict";\n`,
+		`const _fixtures_ = Object.create(null)\n`
+	]
 
-	constructor(compiler: Compiler) {
-		this.c = compiler
-		this.code = [
-			`"use strict";\n`,
-			`const _fixtures_ = Object.create(null)\n`
-		]
+	push(s: string) {
+		this.code.push(s)
 	}
 
 	getCode(): string {

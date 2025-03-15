@@ -22,15 +22,10 @@ export class CompileError extends Error {
 export class ItemCtx {
 	// reference to item itself is stored in each component
 	// because pointer jumping
-	tyck: Huk
-	cg: ItemCodegen
-	network: ItemNetwork
+	tyck: Huk = null
+	cg: ItemCodegen = null
 
-	constructor(network: ItemNetwork) {
-		this.tyck = null
-		this.cg = null
-		this.network = network
-	}
+	constructor(public network: ItemNetwork) {}
 
 	init(tyck: RootTyck, cg: RootCodegen | null, item: any) {
 		this.tyck = new Huk(this, tyck, item)
@@ -45,21 +40,17 @@ export class ItemCtx {
 }
 
 export class Compiler {
-src: string
-logging: boolean
-logs: string[]
-tyck: RootTyck
-cg: RootCodegen
-itemCtx: ItemCtx
+private src: string
+private logs: string[] = []
+private tyck: RootTyck = new RootTyck()
+private cg: RootCodegen = new RootCodegen()
+private itemCtx: ItemCtx = new ItemCtx(Compiler.makeItemNetwork())
 
-constructor(src: string, logging: boolean) {
-	this.src = std + src
-	this.logging = logging
-	this.logs = []
-	this.tyck = new RootTyck(this)
-	this.cg = new RootCodegen(this)
-	this.itemCtx = new ItemCtx(Compiler.makeItemNetwork())
-}
+constructor(
+	src: string,
+	private logging: boolean) {
+		this.src = std + src
+	}
 
 static makeItemNetwork() {
 	return new ItemNetwork([
@@ -90,7 +81,7 @@ reportError(e: CompileError) {
 }
 
 compile() {
-	return this.analyze(new Syntax(this).syntax())
+	return this.analyze(new Syntax(this.src).syntax())
 }
 
 analyze(items: Iterable<any>) {
