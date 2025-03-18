@@ -1,7 +1,7 @@
 import { assertEq, nonExhaustiveMatch, join, setContains, mapInsert, ObjectMap } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
-import { CompileError, Compiler, ItemCtx } from './compile.ts'
+import { CompileError, ItemCtx } from './compile.ts'
 import { RootTyck } from './huk.ts'
 
 export function mangle(path: string) {
@@ -71,10 +71,11 @@ private expr(): string {
 		return ins.code
 	case Syntax.int:
 		return `${ins.data}`
-	case Syntax.use:
+	case Syntax.use: {
 		let name = ins.name
 		return setContains(this.rootTyck.globals, name) ?
 			"_fixtures_."+name : name
+	}
 	case Syntax.array: {
 		let ixs: string[] = []
 		while (this.nextIns().tag!==Syntax.endarray)
@@ -82,7 +83,7 @@ private expr(): string {
 		this.k++
 		return this.emitSsa(`[${join(ixs)}]`)
 	}
-	case Syntax.app:
+	case Syntax.app: {
 		let ixs: string[] = []
 		// generate strict arguments
 		while (![Syntax.endapp, Syntax.applam].includes(this.nextIns().tag))
@@ -112,18 +113,20 @@ private expr(): string {
 
 		this.code.push(`  );\n`)
 		return this.emitYieldStar(genIx)
+	}
 
 	// types
 
 	case Syntax.any:
 		return `{tag:"any"}`
-	case Syntax.arrow:
+	case Syntax.arrow: {
 		let domain: string[] = []
 		while (this.nextIns().tag !== Syntax.endarrow)
 			domain.push(this.expr())
 		this.k++
 		let codomain = this.expr()
 		return `{tag:"arrow", domain:[${join(domain)}], codomain:${codomain}}`
+	}
 	default:
 		nonExhaustiveMatch(ins.tag)
 	}
@@ -140,7 +143,7 @@ codegenUncached(): ObjectMap<string> {
 	let toplevels: ObjectMap<string> = Object.create(null)
 
 	switch (item.tag) {
-	case Syntax.cls:
+	case Syntax.cls: {
 		let elimCode = []
 		let ps = join(item.conss.map(x=>x.name))
 		elimCode.push(`function*(self, ${ps}) {\n  switch (self.tag) {\n`)
@@ -163,13 +166,15 @@ codegenUncached(): ObjectMap<string> {
 			`  }\n}\n`)
 		mapInsert(toplevels, item.name+"ᐅelim", elimCode.join(""))
 		break
-	case Syntax.let:
+	}
+	case Syntax.let: {
 		this.code.push(`(function*() {\n`)
 		let retIx = this.expr()
 		this.code.push(`  return ${retIx}\n})().next().value`)
 		mapInsert(toplevels, item.name, this.unshiftCode())
 		break
-	case Syntax.fun:
+	}
+	case Syntax.fun: {
 		let bs = item.bs.map(x=>x.name)
 		this.code.push(`(function*(${join(bs)}) {\n`)
 		let retIx2 = this.expr()
@@ -177,6 +182,7 @@ codegenUncached(): ObjectMap<string> {
 		this.code.push(`  return ${retIx2}\n})`)
 		mapInsert(toplevels, this.itemCtx.tyck.getFunName(), this.unshiftCode())
 		break
+	}
 	case Syntax.nakedfun:
 		this.code.push(`  return ${this.expr()}`)
 		mapInsert(toplevels, "_", this.unshiftCode())

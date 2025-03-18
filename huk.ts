@@ -128,7 +128,7 @@ private jitCompile(code: string): Function {
 }
 
 // normalization by jit compilation
-private normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
+private normalize(tyExpr: {tag: symbol, span: number, arena: any[]}) {
 	try {
 	assertEq(tyExpr.tag, Syntax.nakedfun)
 
@@ -218,10 +218,11 @@ private static instantiate0(varMap: ObjectMap<string>, ty: any) {
 			domain: ty.domain.map(this.instantiate0.bind(this, varMap)),
 			codomain: this.instantiate0(varMap, ty.codomain)
 		}
-	case "use":
+	case "use": {
 		let name = varMap[ty.name]
 		if (name === undefined) return ty
 		return mkEUse(name)
+	}
 	case "any":
 	case "euse":
 		return ty
@@ -237,7 +238,7 @@ private substitute(ty: any) {
 	case "any":
 	case "use":
 		return ty
-	case "euse":
+	case "euse": {
 		let ix = findUniqueIndex(this.ctx, x=>
 			x.tag === "esolve" && x.name === ty.name)
 
@@ -248,6 +249,7 @@ private substitute(ty: any) {
 		assert(ix !== -1, "evar not found") // invariant
 		return this.ctx[ix].solution !== undefined ? this.ctx[ix].solution :
 			ty
+	}
 	case "cons":
 		return {tag: "cons",
 			name: ty.name, 
@@ -348,7 +350,7 @@ private infer_() {
 		return {tag: "any"}
 	case Syntax.int:
 		return {tag:"cons", name:"Int", args:[]}
-	case Syntax.use:
+	case Syntax.use: {
 		// try finding a uni
 		if (this.ctx.findLastIndex(x=>
 			x.tag === "uni" && x.name === ins.name) !== -1)
@@ -363,7 +365,8 @@ private infer_() {
 		let gb = this.root.globals[ins.name]
 		if (gb === undefined) error("var not found")
 		return this.instantiate(gb.gs, gb.ty)
-	case Syntax.array:
+	}
+	case Syntax.array: {
 		// if array is empty, element type is a fresh evar, otherwise infer
 		let elementTy = this.nextIns().tag===Syntax.endarray ?
 			mkEUse(this.allocEVar("Arr")) :
@@ -374,7 +377,8 @@ private infer_() {
 		this.k++
 
 		return {tag:"cons", name:"Array", args:[elementTy]}
-	case Syntax.app:
+	}
+	case Syntax.app: {
 		let isMethod = ins.metName !== null
 		let fty
 		if (!isMethod)
@@ -446,7 +450,7 @@ private infer_() {
 
 		assertEq(this.stepIns().tag, Syntax.endapp) // invariant
 		return this.substitute(fty.codomain)
-
+	}
 	// Types
 	case Syntax.any:
 	case Syntax.arrow:
@@ -481,12 +485,13 @@ private check(ty: any) {
 	case Syntax.app:
 	// Types
 	case Syntax.any:
-	case Syntax.arrow:
+	case Syntax.arrow: {
 		this.k--
 		let ty2 = this.infer()
 		this.unifyUi(this.substitute(ty2),
 			this.substitute(ty))
 		return
+	}
 	default:
 		nonExhaustiveMatch(ins.tag)
 	}
@@ -572,7 +577,7 @@ tyck() {
 		})
 		break
 	}
-	case Syntax.fun:
+	case Syntax.fun: {
 		assert(item.annots.length <= 1)
 
 		// normalize the function type
@@ -625,6 +630,7 @@ tyck() {
 			this.jitCompile(cgs[name])
 		)
 		break
+	}
 
 	// When checking a type annotation
 	case Syntax.nakedfun:

@@ -1,5 +1,5 @@
 import { mangle } from './codegen.ts'
-import { CompileError, Compiler } from './compile.ts'
+import { CompileError } from './compile.ts'
 import { error, assert, assertL, fuel, range, last } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
