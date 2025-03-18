@@ -138,7 +138,7 @@ private normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
 	env._fixtures_ = this.root.fixtures
 	for (let x of this.ctx) {
 		if (x.tag === "uni")
-			env[x.name] = {tag:"use",name:x.name}
+			env[x.name] = mkUse(x.name)
 	}
 	let envv = Object.entries(env)
 	let paramNames = envv.map(x=>x[0])
@@ -221,7 +221,7 @@ private static instantiate0(varMap: ObjectMap<string>, ty: any) {
 	case "use":
 		let name = varMap[ty.name]
 		if (name === undefined) return ty
-		return {tag: "euse", name}
+		return mkEUse(name)
 	case "any":
 	case "euse":
 		return ty
