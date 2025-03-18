@@ -49,20 +49,20 @@ constructor(
 	private root: RootTyck, // toplevel tycker
 	private item: any) {}
 
-ins() {
+private ins() {
 	return this.item.arena[Math.max(this.k-1, 0)]
 }
 
-nextIns() {
+private nextIns() {
 	return this.item.arena[this.k]
 }
 
-stepIns() {
+private stepIns() {
 	return this.item.arena[this.k++]
 }
 
 // invent a name like hint but not present in "taken"
-static invent(hint: string, taken: string[]) {
+private static invent(hint: string, taken: string[]) {
 	while (taken.includes(hint)) {
 		let [_, alpha, num] =
 			hint.match(/(\D*)(\d*)/)
@@ -72,7 +72,7 @@ static invent(hint: string, taken: string[]) {
 	return hint
 }
 
-showCtx() {
+private showCtx() {
 	let s = map(this.ctx, x => {
 		switch (x.tag) {
 		case "uni": return x.name
@@ -85,26 +85,26 @@ showCtx() {
 	return join(s)
 }
 
-pushTyping(s: string) {
+private pushTyping(s: string) {
 	this.log.push("  ".repeat(this.depth) + s)
 }
 
-pushCtx() {
+private pushCtx() {
 	this.pushTyping("\x1b[33m" + this.showCtx() + "\x1b[0m")
 }
 
-enterTyping(s: string) {
+private enterTyping(s: string) {
 	this.pushTyping(s)
 	this.depth++
 }
 
-exitTyping(s: string) {
+private exitTyping(s: string) {
 	this.depth--
 	this.pushTyping(s)
 	this.pushCtx()
 }
 
-addTyping(s: string) {
+private addTyping(s: string) {
 	this.pushTyping(s)
 	this.pushCtx()
 }
@@ -118,7 +118,7 @@ getMethodNameAt(insLocation: number) {
 }
 
 // jit compile and close the code with a _fixtures_ object
-jitCompile(code: string): Function {
+private jitCompile(code: string): Function {
 	try {
 	code = `"use strict";\nreturn ` + code
 	return new Function("_fixtures_", code)(this.root.fixtures)
@@ -128,7 +128,7 @@ jitCompile(code: string): Function {
 }
 
 // normalization by jit compilation
-normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
+private normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
 	try {
 	assertEq(tyExpr.tag, Syntax.nakedfun)
 
@@ -169,30 +169,30 @@ normalize(tyExpr: {tag: Symbol, span: number, arena: any[]}) {
 	}
 }
 
-getTakenEVarNames(): string[] {
+private getTakenEVarNames(): string[] {
 	return [...map(filter(this.ctx, x=>
 		x.tag === "evar" || x.tag === "esolve"),
 		x=>x.name)]
 }
 
-allocEVar_(hint: string, taken: string[]) {
+private allocEVar_(hint: string, taken: string[]) {
 	let name = Huk.invent(hint, taken)
 	this.ctx.push({tag:"evar", name})
 	return name
 }
 
-allocEVarMut(hint: string, taken: string[]) {
+private allocEVarMut(hint: string, taken: string[]) {
 	let name = this.allocEVar_(hint, taken)
 	taken.push(name)
 	return name
 }
 
-allocEVar(hint: string) {
+private allocEVar(hint: string) {
 	return this.allocEVar_(hint, this.getTakenEVarNames())
 }
 
 // Replace universal variables with existentials
-instantiate(vars: string[], ty: any) {
+private instantiate(vars: string[], ty: any) {
 	this.enterTyping(`|- inst(${prettyPrint(vars)}, ${showType(ty)})`)
 
 	// generate fresh evar names
@@ -206,7 +206,7 @@ instantiate(vars: string[], ty: any) {
 	return ty1
 }
 
-static instantiate0(varMap: ObjectMap<string>, ty: any) {
+private static instantiate0(varMap: ObjectMap<string>, ty: any) {
 	switch (ty.tag) {
 	case "cons":
 		return {tag: "cons",
@@ -231,7 +231,7 @@ static instantiate0(varMap: ObjectMap<string>, ty: any) {
 }
 
 // bidir.pdf: [Г]A
-substitute(ty: any) {
+private substitute(ty: any) {
 	//this.addTyping(`[${this.showCtx()}]${showType(ty)}`)
 	switch (ty.tag) {
 	case "any":
@@ -263,7 +263,7 @@ substitute(ty: any) {
 	}
 }
 
-solveEvarTo(name: string, solution: any) {
+private solveEvarTo(name: string, solution: any) {
 	this.addTyping(`|- ?${name} <:= ${showType(solution)}`)
 	assert(!this.ctx.some(
 		x => x.tag === "esolve" && x.name === name),
@@ -276,7 +276,7 @@ solveEvarTo(name: string, solution: any) {
 	//todo: occurs check
 }
 
-unify_(ty1: any, ty2: any) {
+private unify_(ty1: any, ty2: any) {
 	if (ty1.tag === "euse" &&
 		ty2.tag === "euse" &&
 		ty1.name === ty2.name)
@@ -320,13 +320,13 @@ unify_(ty1: any, ty2: any) {
 	}
 }
 
-unify(ty1: any, ty2: any) {
+private unify(ty1: any, ty2: any) {
 	this.enterTyping(`|- ${showType(ty1)} <: ${showType(ty2)}`)
 	this.unify_(ty1, ty2)
 	this.exitTyping(`-| ${showType(ty1)} <: ${showType(ty2)}`)
 }
 
-unifyUi(ty1: any, ty2: any) {
+private unifyUi(ty1: any, ty2: any) {
 	try {
 		this.unify(ty1, ty2)
 	} catch (e) {
@@ -338,7 +338,7 @@ unifyUi(ty1: any, ty2: any) {
 	}
 }
 
-infer_() {
+private infer_() {
 	let insLocation = this.k
 	let ins = this.stepIns()
 	switch (ins.tag) {
@@ -456,7 +456,7 @@ infer_() {
 	}
 }
 
-infer() {
+private infer() {
 	try {
 		this.enterTyping(`|- _ => ?`)
 		let ty = this.infer_()
@@ -468,7 +468,7 @@ infer() {
 	}
 }
 
-check(ty: any) {
+private check(ty: any) {
 	try {
 	let ins = this.stepIns()
 	switch (ins.tag) {

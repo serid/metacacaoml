@@ -65,7 +65,7 @@ log(...xs: any[]) {
 	this.logs.push("\n\n")
 }
 
-reportError(e: CompileError) {
+private reportError(e: CompileError) {
 	if (this.logging) write(e.log)
 
 	let lineNumber = 0
@@ -84,7 +84,7 @@ compile() {
 	return this.analyze(new Syntax(this.src).syntax())
 }
 
-analyze(items: Iterable<any>) {
+private analyze(items: Iterable<any>) {
 	try {
 		for (let item of items) {
 			this.itemCtx.init(this.tyck, this.cg, item)

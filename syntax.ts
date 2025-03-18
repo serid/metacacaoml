@@ -32,46 +32,46 @@ private i: number = 0
 
 constructor(private s: string) {}
 
-notPastEof() {
+private notPastEof() {
 	return this.i < this.s.length
 }
 
-checkInvariant() {
+private checkInvariant() {
 	assert(this.notPastEof(), "i out of bounds")
 }
 
-peekWord(w: string) {
+private peekWord(w: string) {
 	return isPrefix(this.s, this.i, w)
 }
 
-tryWordNoWhitespace(w: string) {
+private tryWordNoWhitespace(w: string) {
 	if (!this.peekWord(w)) return false
 	this.i += w.length
 	return true
 }
 
-tryWord(w: string) {
+private tryWord(w: string) {
 	let b = this.tryWordNoWhitespace(w)
 	if (!b) return false
 	this.tryWhitespace()
 	return true
 }
 
-assertWord(w: string) {
+private assertWord(w: string) {
 	assertL(this.tryWord(w), () => `expected "${w}"`) 
 }
 
-peekChar() {
+private peekChar() {
 	this.checkInvariant()
 	return this.s[this.i]
 }
 
-char() {
+private char() {
 	this.checkInvariant()
 	return this.s[this.i++]
 }
 
-tryComment() {
+private tryComment() {
 	while (true) {
 	if (this.tryWord("#{")) {
 		while (this.notPastEof() && this.peekChar() !== '}') {
@@ -88,7 +88,7 @@ tryComment() {
 	}
 }
 
-tryWhitespace() {
+private tryWhitespace() {
 	while (this.notPastEof()) {
 		this.tryComment()
 		if (/\s/.test(this.peekChar())) {
@@ -99,7 +99,7 @@ tryWhitespace() {
 	}
 }
 
-ident() {
+private ident() {
 	let anlautRule = /[a-zA-Z\-]/
 	let inlautRule = /[a-zA-Z0-9\-/]/
 	let id = ""
@@ -117,13 +117,13 @@ ident() {
 	return mangle(id)
 }
 
-assertIdent() {
+private assertIdent() {
 	let id = this.ident()
 	assert(id !== null, "expected ident")
 	return id
 }
 
-stringLiteral(end: string) {
+private stringLiteral(end: string) {
 	let s = ""
 	while (!this.tryWordNoWhitespace(end))
 		s += this.char()
@@ -131,21 +131,21 @@ stringLiteral(end: string) {
 	return s
 }
 
-type() {
+private type() {
 	return {tag: Syntax.nakedfun,
 		span: this.i,
 		arena: this.expr()
 	}
 }
 
-idents(end: string) {
+private idents(end: string) {
 	let ns = []
 	while (!this.tryWord(end))
 		ns.push(this.assertIdent())
 	return ns
 }
 
-generics() {
+private generics() {
 	let gs = []
 	while (this.tryWord("'")) {
 		gs.push(this.assertIdent())
@@ -153,7 +153,7 @@ generics() {
 	return gs
 }
 
-binding() {
+private binding() {
 	let name = this.ident()
 	if (name === null) return null
 	this.assertWord(":")
@@ -161,7 +161,7 @@ binding() {
 	return { name, type }
 }
 
-bindings() {
+private bindings() {
 	let bs = []
 	while (!this.tryWord(")")) {
 		fuel.step()
@@ -171,7 +171,7 @@ bindings() {
 }
 
 // returns an array of instructions
-expr(): any[] {
+private expr(): any[] {
 	let span = this.i
 	let insQueue = []
 	if (this.tryWord('"')) {
@@ -275,7 +275,7 @@ expr(): any[] {
 	return insQueue
 }
 
-toplevel() {
+private toplevel() {
 	let annots = []
 	if (this.tryWord("@")) {
 		let name = this.assertIdent()

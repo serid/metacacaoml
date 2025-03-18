@@ -24,35 +24,35 @@ constructor(
 	private rootTyck: RootTyck, // toplevel tyck
 	private item: any) {}
 
-ins() {
+private ins() {
 	return this.item.arena[Math.max(this.k-1, 0)]
 }
 
-nextIns() {
+private nextIns() {
 	return this.item.arena[this.k]
 }
 
-stepIns() {
+private stepIns() {
 	return this.item.arena[this.k++]
 }
 
-alloc() {
+private alloc() {
 	return "_" + this.nextVar++
 }
 
-unshiftCode() {
+private unshiftCode() {
 	let out = this.code.join("")
 	this.code = []
 	return out
 }
 
-emitSsa(e: string) {
+private emitSsa(e: string) {
 	let ix = this.alloc()
 	this.code.push(`  const ${ix} = ${e}\n`)
 	return ix
 }
 
-emitYieldStar(what: string): string {
+private emitYieldStar(what: string): string {
 	let yieldReturnVar = this.alloc()
 	this.code.push(`  let ${yieldReturnVar}; while (true) { let pair = ${what}` +
 		`.next(); if (pair.done) { ${yieldReturnVar} = pair.value; break }` +
@@ -60,7 +60,7 @@ emitYieldStar(what: string): string {
 	return yieldReturnVar
 }
 
-expr(): string {
+private expr(): string {
 	try {
 	let insLocation = this.k
 	let ins = this.stepIns()
