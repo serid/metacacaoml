@@ -13,7 +13,7 @@ function showType(ty: any) {
 	case "euse":
 		return "?" + ty.name
 	case "cons":
-		return `${ty.name}(${ty.args.map(showType).join(" ")})`
+		return `${ty.fullName}(${ty.args.map(showType).join(" ")})`
 	case "arrow":
 		return `[${ty.domain.map(showType).join(" ")}]` + showType(ty.codomain)
 	default:
@@ -21,7 +21,7 @@ function showType(ty: any) {
 	}
 }
 
-const useType = {tag: "cons", name: "Type", args: []}
+const useType = {tag: "cons", fullName: "Type", args: []}
 
 function mkUse(name: string) {
 	return {tag:"use",name}
@@ -41,8 +41,8 @@ private depth: number = 0
 private log: string[] = []
 
 // Codegen will be querying the methodname
-private methodNameAt: ObjectMap<string> = Object.create(null)
-private funName: string = null
+private methodSymbolAt: ObjectMap<string> = Object.create(null)
+private funSymbol: string = null
 
 constructor(
 	private itemCtx: ItemCtx,
@@ -109,12 +109,12 @@ private addTyping(s: string) {
 	this.pushCtx()
 }
 
-getFunName() {
-	return this.funName
+getFunSymbol() {
+	return this.funSymbol
 }
 
-getMethodNameAt(insLocation: number) {
-	return mapGet(this.methodNameAt, insLocation)
+getMethodSymbolAt(insLocation: number) {
+	return mapGet(this.methodSymbolAt, insLocation)
 }
 
 // jit compile and close the code with a _fixtures_ object
@@ -210,7 +210,7 @@ private static instantiate0(varMap: ObjectMap<string>, ty: any) {
 	switch (ty.tag) {
 	case "cons":
 		return {tag: "cons",
-			name: ty.name,
+			fullName: ty.fullName,
 			args: ty.args.map(this.instantiate0.bind(this, varMap))
 		}
 	case "arrow":
@@ -252,7 +252,7 @@ private substitute(ty: any) {
 	}
 	case "cons":
 		return {tag: "cons",
-			name: ty.name, 
+			fullName: ty.fullName,
 			args: ty.args.map(this.substitute.bind(this))
 		}
 	case "arrow":
@@ -300,7 +300,7 @@ private unify_(ty1: any, ty2: any) {
 		break
 	case "cons":
 		assertEq(ty2.tag, "cons")
-		assertEq(ty1.name, ty2.name)
+		assertEq(ty1.fullName, ty2.fullName)
 		for (let i of range(assertEq(ty1.args.length, ty2.args.length))) {
 			this.unify(ty1.args[i], ty2.args[i])
 			ty1 = this.substitute(ty1)
@@ -345,11 +345,11 @@ private infer_() {
 	let ins = this.stepIns()
 	switch (ins.tag) {
 	case Syntax.strlit:
-		return {tag:"cons", name:"String", args:[]}
+		return {tag:"cons", fullName:"String", args:[]}
 	case Syntax.native:
 		return {tag: "any"}
 	case Syntax.int:
-		return {tag:"cons", name:"Int", args:[]}
+		return {tag:"cons", fullName:"Int", args:[]}
 	case Syntax.use: {
 		// try finding a uni
 		if (this.ctx.findLastIndex(x=>
@@ -376,7 +376,7 @@ private infer_() {
 			this.check(elementTy)
 		this.k++
 
-		return {tag:"cons", name:"Array", args:[elementTy]}
+		return {tag:"cons", fullName:"Array", args:[elementTy]}
 	}
 	case Syntax.app: {
 		let isMethod = ins.metName !== null
@@ -387,9 +387,9 @@ private infer_() {
 			let receiver = this.infer()
 			assertEq(receiver.tag, "cons")
 
-			let methodName = receiver.name+"ᐅ"+ins.metName
-			mapInsert(this.methodNameAt, insLocation, methodName)
-			let gb = this.root.globals[methodName]
+			let methodSymbol = receiver.fullName+"ᐅ"+ins.metName
+			mapInsert(this.methodSymbolAt, insLocation, methodSymbol)
+			let gb = this.root.globals[methodSymbol]
 
 			assert(gb !== undefined,
 				"method not found")
@@ -515,9 +515,9 @@ tyck() {
 			// todo: use codegen to get the value.. except types are not present
 			// at runtime and are thus not codegened (?)
 			value: new LateInit(item.gs.length===0
-			? {tag:"cons", name:item.name, args:[]}
+			? {tag:"cons", fullName:item.name, args:[]}
 			: function*(...xs){
-				return {tag:"cons", name:item.name, args:xs}
+				return {tag:"cons", fullName:item.name, args:xs}
 			})
 		})
 
@@ -534,19 +534,19 @@ tyck() {
 		// codegen constructors and eliminator
 		let conssCode = this.itemCtx.cg.codegen()
 		let conssFuns = mapFilterMapProjection(conssCode,
-			(_name, code) => this.jitCompile(code)
+			(_symbol, code) => this.jitCompile(code)
 		)
 
 		let self = {tag: "cons", 
-			name:item.name,
+			fullName:item.name,
 			args:item.gs.map(mkUse)
 		}
 		for (let c of normalConss) {
-			let name = item.name+"ᐅ"+c.name
+			let symbol = item.name+"ᐅ"+c.name
 			mapInsert(this.root.globals, item.name+"ᐅ"+c.name, {
 				gs: item.gs,
 				ty: {tag: "arrow", domain: c.fields, codomain: self},
-				value: new LateInit(conssFuns[name])
+				value: new LateInit(conssFuns[symbol])
 			})
 		}
 		let ret = Huk.invent("R", item.gs)
@@ -555,11 +555,11 @@ tyck() {
 			codomain: mkUse(ret)
 		})
 		))
-		let name = item.name+"ᐅelim"
-		mapInsert(this.root.globals, name, {
+		let elimSymbol = item.name+"ᐅelim"
+		mapInsert(this.root.globals, elimSymbol, {
 			gs: item.gs.concat([ret]),
 			ty: {tag: "arrow", domain: domain, codomain: mkUse(ret)},
-			value: new LateInit(conssFuns[name])
+			value: new LateInit(conssFuns[elimSymbol])
 		})
 		break
 	}
@@ -592,15 +592,15 @@ tyck() {
 		let domain = normalParams
 		let codomain = this.normalize(item.retT)
 
-		let name
+		let symbol
 		if (item.isMethod) {
 			assert(item.bs.length >= 1)
 			assertEq(domain[0].tag, "cons")
-			name = domain[0].name + "ᐅ" + item.name
-		} else name = item.name
-		this.funName = name
+			symbol = domain[0].fullName + "ᐅ" + item.name
+		} else symbol = item.name
+		this.funSymbol = symbol
 
-		mapInsert(this.root.globals, name, {
+		mapInsert(this.root.globals, symbol, {
 			gs: item.gs,
 			ty: {tag: "arrow", domain, codomain},
 			value: new LateInit()
@@ -617,17 +617,17 @@ tyck() {
 				while (e.cause !== undefined) e = e.cause
 				assertEq(e.message, expected)
 
-				mapRemove(this.root.globals, name)
+				mapRemove(this.root.globals, symbol)
 				break
 			}
 		}
 
 		let cgs = this.itemCtx.cg.codegen()
-		assertEq(Object.keys(cgs), [name])
+		assertEq(Object.keys(cgs), [symbol])
 
 		// fill-in the fixture
-		mapGet(this.root.globals, name).value.set(
-			this.jitCompile(cgs[name])
+		mapGet(this.root.globals, symbol).value.set(
+			this.jitCompile(cgs[symbol])
 		)
 		break
 	}
@@ -652,7 +652,7 @@ export class RootTyck {
 	globals: ObjectMap<{gs: string[], ty: any, value: LateInit<any>}> =
 		Object.create(null)
 	fixtures: ObjectMap<any> = mapFilterMapProjection(this.globals,
-		(_name, entry) => {
+		(_symbol, entry) => {
 			if (entry.value === null) return null
 			return entry.value.get()
 		})

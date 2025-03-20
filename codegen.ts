@@ -91,7 +91,7 @@ private expr(): string {
 
 		// For methods, fetch full name produced by tyck, otherwise the fun is first expression
 		let fun = ins.metName !== null ?
-			"_fixtures_."+this.itemCtx.tyck.getMethodNameAt(insLocation) :
+			"_fixtures_."+this.itemCtx.tyck.getMethodSymbolAt(insLocation) :
 			ixs.shift()
 
 		// A contrived codegen spell indeed
@@ -180,7 +180,7 @@ codegenUncached(): ObjectMap<string> {
 		let retIx2 = this.expr()
 
 		this.code.push(`  return ${retIx2}\n})`)
-		mapInsert(toplevels, this.itemCtx.tyck.getFunName(), this.unshiftCode())
+		mapInsert(toplevels, this.itemCtx.tyck.getFunSymbol(), this.unshiftCode())
 		break
 	}
 	case Syntax.nakedfun:
@@ -205,7 +205,7 @@ codegen(): ObjectMap<string> {
 step() {
 	let cgs = this.codegen()
 	let aToplevel = Object.entries(cgs).flatMap(
-		([name, code]) => ["_fixtures_.", name, " = ", code, "\n"]).join("")
+		([symbol, code]) => ["_fixtures_.", symbol, " = ", code, "\n"]).join("")
 	this.root.push(aToplevel)
 }
 }

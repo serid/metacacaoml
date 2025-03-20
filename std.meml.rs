@@ -150,7 +150,7 @@ fun .map('A 'B i:Iter(A) f:[A]B): Iter(B) =
 	{ x. Option/Some(f(x)) }
 
 class Type end
-fun .name(t: Type): String = native[|t.name|]
+fun .name(t: Type): String = native[|t.fullName|]
 
 fun make-tuple-type(ts: Array(Type)): Type =
 	Pair/elim(ts.unsnoc().unwrap()) λ init last.
