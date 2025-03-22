@@ -42,7 +42,6 @@ private log: string[] = []
 
 // Codegen will be querying the methodname
 private methodSymbolAt: ObjectMap<string> = Object.create(null)
-private funSymbol: string = null
 
 constructor(
 	private itemCtx: ItemCtx,
@@ -107,10 +106,6 @@ private exitTyping(s: string) {
 private addTyping(s: string) {
 	this.pushTyping(s)
 	this.pushCtx()
-}
-
-getFunSymbol() {
-	return this.funSymbol
 }
 
 getMethodSymbolAt(insLocation: number) {
@@ -595,7 +590,6 @@ tyck() {
 		let codomain = this.normalize(item.retT)
 
 		let symbol = this.itemCtx.getToplevelSymbol()
-		this.funSymbol = symbol // todo
 
 		mapInsert(this.root.globals, symbol, {
 			gs: item.gs,

@@ -180,7 +180,7 @@ codegenUncached(): ObjectMap<string> {
 		let retIx2 = this.expr()
 
 		this.code.push(`  return ${retIx2}\n})`)
-		mapInsert(toplevels, this.itemCtx.tyck.getFunSymbol(), this.unshiftCode())
+		mapInsert(toplevels, this.itemCtx.getToplevelSymbol(), this.unshiftCode())
 		break
 	}
 	case Syntax.nakedfun:
