@@ -6,7 +6,7 @@ function argsToString(args: string[]) {
 	return args.join(":")
 }
 
-export class ItemNetwork {
+export class Network {
 	private cache: ObjectMap<ObjectMap<any>> = Object.create(null)
 
 	constructor(private paths: string[]) {

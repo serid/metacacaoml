@@ -3,7 +3,7 @@ import { assert, error, nonExhaustiveMatch, range, toString, unSingleton, write 
 import { Syntax } from "./syntax.ts"
 import { Huk, RootTyck } from "./huk.ts"
 import { ItemCodegen, RootCodegen } from "./codegen.ts"
-import { ItemNetwork } from './flow.ts'
+import { Network } from './flow.ts'
 
 const std = await globalThis.Deno.readTextFile("./std.meml.rs")
 
@@ -26,7 +26,7 @@ export class ItemCtx {
 	cg: ItemCodegen
 
 	constructor(tyck: RootTyck, cg: RootCodegen | null,
-		public network: ItemNetwork, private item: any) {
+		public network: Network, private item: any) {
 		this.tyck = new Huk(this, tyck, item)
 		this.cg = new ItemCodegen(this, cg, tyck, item)
 	}
@@ -96,7 +96,7 @@ constructor(
 	}
 
 static makeItemNetwork() {
-	return new ItemNetwork([
+	return new Network([
 		"toplevel-symbols",
 		"codegen-item",
 	])
