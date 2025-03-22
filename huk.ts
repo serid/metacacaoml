@@ -139,8 +139,8 @@ private normalize(tyExpr: {tag: symbol, span: number, arena: any[]}) {
 	let paramNames = envv.map(x=>x[0])
 	let args = envv.map(x=>x[1])
 
-	let nakedCtx = new ItemCtx(Compiler.makeItemNetwork())
-	nakedCtx.init(tyExpr, this.root, null)
+	let nakedCtx = new ItemCtx(
+		this.root, null, Compiler.makeItemNetwork(), tyExpr)
 
 	//kinda hacky idk
 	nakedCtx.tyck.ctx = [...this.ctx]

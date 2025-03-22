@@ -22,23 +22,13 @@ export class CompileError extends Error {
 export class ItemCtx {
 	// reference to item itself is additionally stored in each component
 	// because pointer jumping
-	private item: any = null
-	tyck: Huk = null
-	cg: ItemCodegen = null
+	tyck: Huk
+	cg: ItemCodegen
 
-	constructor(public network: ItemNetwork) {}
-
-	init(item: any, tyck: RootTyck, cg: RootCodegen | null) {
-		this.item = item
+	constructor(tyck: RootTyck, cg: RootCodegen | null,
+		public network: ItemNetwork, private item: any) {
 		this.tyck = new Huk(this, tyck, item)
 		this.cg = new ItemCodegen(this, cg, tyck, item)
-	}
-
-	reset() {
-		this.item = null
-		this.tyck = null
-		this.cg = null
-		this.network.resetCache()
 	}
 
 	// symbols introduced by this item
@@ -98,7 +88,6 @@ private src: string
 private logs: string[] = []
 private tyck: RootTyck = new RootTyck()
 private cg: RootCodegen = new RootCodegen()
-private itemCtx: ItemCtx = new ItemCtx(Compiler.makeItemNetwork())
 
 constructor(
 	src: string,
@@ -142,11 +131,10 @@ compile() {
 private analyze(items: Iterable<any>) {
 	try {
 		for (let item of items) {
-			this.itemCtx.init(item, this.tyck, this.cg)
-			this.itemCtx.tyck.tyck()
-			this.itemCtx.cg.step()
-
-			this.itemCtx.reset()
+			let itemCtx = new ItemCtx(
+				this.tyck, this.cg, Compiler.makeItemNetwork(), item)
+			itemCtx.tyck.tyck()
+			itemCtx.cg.step()
 		}
 
 		this.log(`normalizations count: ` + this.tyck.normalCounter)
