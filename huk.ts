@@ -242,7 +242,7 @@ private substitute(ty: any) {
 		let ix = findUniqueIndex(this.ctx, x=>
 			x.tag === "esolve" && x.name === ty.name)
 
-		// evar not solved, but is it even declared? 
+		// evar not solved, but is it even declared?
 		if (ix === -1)
 			ix = findUniqueIndex(this.ctx, x=>
 				x.tag === "evar" && x.name === ty.name)
@@ -401,7 +401,7 @@ private infer_() {
 		assertEq(fty.tag, "arrow") //todo evar
 
 		for (let i of range(isMethod?1:0, fty.domain.length)) {
-			// mutate the type as we iterate through it, yuppie!!! 
+			// mutate the type as we iterate through it, yuppie!!!
 			// this is necessary since context grows in information as we check arguments
 			// todo: performance: only substitute remaining arguments
 			fty = this.substitute(fty)
@@ -537,7 +537,7 @@ tyck() {
 			(_symbol, code) => this.jitCompile(code)
 		)
 
-		let self = {tag: "cons", 
+		let self = {tag: "cons",
 			fullName:item.name,
 			args:item.gs.map(mkUse)
 		}

@@ -58,7 +58,7 @@ private tryWord(w: string) {
 }
 
 private assertWord(w: string) {
-	assertL(this.tryWord(w), () => `expected "${w}"`) 
+	assertL(this.tryWord(w), () => `expected "${w}"`)
 }
 
 private peekChar() {
@@ -299,7 +299,7 @@ private toplevel() {
 			let c = 0
 			while (!this.tryWord(")")) {
 				fields.push({
-					name: "_" + c++, 
+					name: "_" + c++,
 					type: this.type()
 				})
 			}

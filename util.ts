@@ -7,7 +7,7 @@ export function error(e?: string): never {
 }
 
 export function assert(b: boolean, e?: string) {
-	if (!b) error(e) 
+	if (!b) error(e)
 }
 
 export function assertL(b: boolean, le: () => string) {
