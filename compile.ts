@@ -1,4 +1,4 @@
-import { assert, range, toString, write } from './util.ts'
+import { assert, error, nonExhaustiveMatch, range, toString, unSingleton, write } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Huk, RootTyck } from "./huk.ts"
@@ -20,22 +20,76 @@ export class CompileError extends Error {
 }
 
 export class ItemCtx {
-	// reference to item itself is stored in each component
+	// reference to item itself is additionally stored in each component
 	// because pointer jumping
+	private item: any = null
 	tyck: Huk = null
 	cg: ItemCodegen = null
 
 	constructor(public network: ItemNetwork) {}
 
-	init(tyck: RootTyck, cg: RootCodegen | null, item: any) {
+	init(item: any, tyck: RootTyck, cg: RootCodegen | null) {
+		this.item = item
 		this.tyck = new Huk(this, tyck, item)
 		this.cg = new ItemCodegen(this, cg, tyck, item)
 	}
 
 	reset() {
+		this.item = null
 		this.tyck = null
 		this.cg = null
 		this.network.resetCache()
+	}
+
+	// symbols introduced by this item
+	private getToplevelSymbols_(): string[] {
+		let item = this.item
+		switch (item.tag) {
+		case Syntax.cls: {
+			let symbol = item.name
+			let symbols = [symbol, symbol+"ᐅelim"]
+			for (let cons of item.conss)
+				symbols.push(symbol+"ᐅ"+cons.name)
+			return symbols
+		}
+		case Syntax.let:
+			return [item.name]
+		case Syntax.fun: {
+			if (!item.isMethod)
+				return [item.name]
+			assert(item.bs.length >= 1, "methods shall have at least one parameter")
+
+			let annotation = item.bs[0].type.arena
+			let className: string
+			switch (annotation[0].tag) {
+				case Syntax.use:
+					className = annotation[0].name
+					break
+				case Syntax.app:
+					assert(annotation[1].tag===Syntax.use, "1st parameter of a method shall be a class")
+					className = annotation[1].name
+					break
+				default:
+					error("1st parameter of a method shall be a class")
+			}
+			return [className + "ᐅ" + item.name]
+		}
+		case Syntax.nakedfun:
+			error("naked fun has no toplevel symbols")
+			break // to please the linter
+		default:
+			nonExhaustiveMatch(item.tag)
+		}
+
+	}
+
+	getToplevelSymbols(): string[] {
+		return this.network.memoize("toplevel-symbols", [],
+			this.getToplevelSymbols_.bind(this))
+	}
+
+	getToplevelSymbol(): string {
+		return unSingleton(this.getToplevelSymbols())
 	}
 }
 
@@ -54,6 +108,7 @@ constructor(
 
 static makeItemNetwork() {
 	return new ItemNetwork([
+		"toplevel-symbols",
 		"codegen-item",
 	])
 }
@@ -87,7 +142,7 @@ compile() {
 private analyze(items: Iterable<any>) {
 	try {
 		for (let item of items) {
-			this.itemCtx.init(this.tyck, this.cg, item)
+			this.itemCtx.init(item, this.tyck, this.cg)
 			this.itemCtx.tyck.tyck()
 			this.itemCtx.cg.step()
 

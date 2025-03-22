@@ -192,6 +192,11 @@ export function unSingleton<A>(xs: A[]): A {
 	return xs[0]
 }
 
+export function first<A>(xs: A[]) {
+	assert(xs.length > 0, "array is empty")
+	return xs[0]
+}
+
 export function last<A>(xs: A[]) {
 	assert(xs.length > 0, "array is empty")
 	return xs[xs.length-1]

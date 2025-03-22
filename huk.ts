@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapGet, LateInit, range, prettyPrint, mapRemove, mapFilterMapProjection } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapGet, LateInit, range, prettyPrint, mapRemove, mapFilterMapProjection, first } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { CompileError, Compiler, ItemCtx } from './compile.ts'
@@ -145,7 +145,7 @@ private normalize(tyExpr: {tag: symbol, span: number, arena: any[]}) {
 	let args = envv.map(x=>x[1])
 
 	let nakedCtx = new ItemCtx(Compiler.makeItemNetwork())
-	nakedCtx.init(this.root, null, tyExpr)
+	nakedCtx.init(tyExpr, this.root, null)
 
 	//kinda hacky idk
 	nakedCtx.tyck.ctx = [...this.ctx]
@@ -506,8 +506,9 @@ tyck() {
 	let item = this.item
 	switch (item.tag) {
 	case Syntax.cls: {
+		let symbol = first(this.itemCtx.getToplevelSymbols())
 		// add type constructor to globals
-		mapInsert(this.root.globals, item.name, {
+		mapInsert(this.root.globals, symbol, {
 			gs: item.gs,
 			ty: item.gs.length===0
 			? useType
@@ -515,9 +516,9 @@ tyck() {
 			// todo: use codegen to get the value.. except types are not present
 			// at runtime and are thus not codegened (?)
 			value: new LateInit(item.gs.length===0
-			? {tag:"cons", fullName:item.name, args:[]}
+			? {tag:"cons", fullName:symbol, args:[]}
 			: function*(...xs){
-				return {tag:"cons", fullName:item.name, args:xs}
+				return {tag:"cons", fullName:symbol, args:xs}
 			})
 		})
 
@@ -538,15 +539,15 @@ tyck() {
 		)
 
 		let self = {tag: "cons",
-			fullName:item.name,
+			fullName:symbol,
 			args:item.gs.map(mkUse)
 		}
 		for (let c of normalConss) {
-			let symbol = item.name+"ᐅ"+c.name
-			mapInsert(this.root.globals, item.name+"ᐅ"+c.name, {
+			let cSymbol = symbol+"ᐅ"+c.name
+			mapInsert(this.root.globals, cSymbol, {
 				gs: item.gs,
 				ty: {tag: "arrow", domain: c.fields, codomain: self},
-				value: new LateInit(conssFuns[symbol])
+				value: new LateInit(conssFuns[cSymbol])
 			})
 		}
 		let ret = Huk.invent("R", item.gs)
@@ -555,7 +556,7 @@ tyck() {
 			codomain: mkUse(ret)
 		})
 		))
-		let elimSymbol = item.name+"ᐅelim"
+		let elimSymbol = symbol+"ᐅelim"
 		mapInsert(this.root.globals, elimSymbol, {
 			gs: item.gs.concat([ret]),
 			ty: {tag: "arrow", domain: domain, codomain: mkUse(ret)},
@@ -564,16 +565,17 @@ tyck() {
 		break
 	}
 	case Syntax.let: {
+		let symbol = this.itemCtx.getToplevelSymbol()
 		let ty = this.normalize(item.retT)
 		this.check(ty)
 
 		let cgs = this.itemCtx.cg.codegen()
-		assertEq(Object.keys(cgs), [item.name])
+		assertEq(Object.keys(cgs), [symbol])
 
-		mapInsert(this.root.globals, item.name, {
+		mapInsert(this.root.globals, symbol, {
 			gs: [],
 			ty,
-			value: new LateInit(this.jitCompile(cgs[item.name]))
+			value: new LateInit(this.jitCompile(cgs[symbol]))
 		})
 		break
 	}
@@ -592,13 +594,8 @@ tyck() {
 		let domain = normalParams
 		let codomain = this.normalize(item.retT)
 
-		let symbol
-		if (item.isMethod) {
-			assert(item.bs.length >= 1)
-			assertEq(domain[0].tag, "cons")
-			symbol = domain[0].fullName + "ᐅ" + item.name
-		} else symbol = item.name
-		this.funSymbol = symbol
+		let symbol = this.itemCtx.getToplevelSymbol()
+		this.funSymbol = symbol // todo
 
 		mapInsert(this.root.globals, symbol, {
 			gs: item.gs,
