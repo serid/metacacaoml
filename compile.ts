@@ -99,6 +99,7 @@ static makeItemNetwork() {
 	return new Network([
 		"toplevel-symbols",
 		"codegen-item",
+		"tyck-item",
 	])
 }
 

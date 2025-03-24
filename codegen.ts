@@ -139,6 +139,7 @@ private expr(): string {
 // list of key-value pairs to add to the global object
 codegenUncached(): ObjectMap<string> {
 	try {
+	this.itemCtx.tyck.tyck()
 	let item = this.item
 	let toplevels: ObjectMap<string> = Object.create(null)
 

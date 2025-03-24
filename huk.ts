@@ -499,7 +499,7 @@ private check(ty: any) {
 // false when typechecking expectedly @Fails
 // true when typechecking succeeds
 // exception upon type error and no @Fails annotations are present
-tyck(): boolean {
+private tyck_(): boolean {
 	try {
 	let item = this.item
 	switch (item.tag) {
@@ -624,6 +624,11 @@ tyck(): boolean {
 		if (e.constructor === CompileError) throw e
 		throw new CompileError(this.item.span, this.log.join("\n"), undefined, { cause: e })
 	}
+}
+
+tyck(): boolean {
+	return this.itemCtx.network.memoize("tyck-item", [],
+		this.tyck_.bind(this))
 }
 
 addFixtures() {
