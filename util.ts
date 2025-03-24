@@ -270,7 +270,7 @@ export function* bind(i: any, k: any) {
 }
 
 export class LateInit<T> {
-	value: T | null
+	private value: T | null
 
 	constructor(value?: T) {
 		if (value === undefined)
@@ -289,6 +289,11 @@ export class LateInit<T> {
 		if (this.value !== null)
 			error("value already set")
 		this.value = value
+	}
+
+	setIfUnsetThen(value: ()=>T) {
+		if (this.value===null)
+			this.value = value()
 	}
 }
 

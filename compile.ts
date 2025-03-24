@@ -135,6 +135,7 @@ private analyze(items: Iterable<any>) {
 				this.tyck, this.cg, Compiler.makeItemNetwork(), item)
 			if (!itemCtx.tyck.tyck()) continue
 			itemCtx.cg.step()
+			itemCtx.tyck.addFixtures()
 		}
 
 		this.log(`normalizations count: ` + this.tyck.normalCounter)

@@ -530,35 +530,32 @@ tyck(): boolean {
 			)
 		}))
 
-		// codegen constructors and eliminator
-		let conssCode = this.itemCtx.cg.codegen()
-		let conssFuns = mapFilterMapProjection(conssCode,
-			(_symbol, code) => this.jitCompile(code)
-		)
-
 		let self = {tag: "cons",
 			fullName:symbol,
 			args:item.gs.map(mkUse)
 		}
-		for (let c of normalConss) {
-			let cSymbol = symbol+"ᐅ"+c.name
-			mapInsert(this.root.globals, cSymbol, {
+		for (let c of normalConss)
+			mapInsert(this.root.globals, symbol+"ᐅ"+c.name, {
 				gs: item.gs,
 				ty: {tag: "arrow", domain: c.fields, codomain: self},
-				value: new LateInit(conssFuns[cSymbol])
+
+				// avoid codegen for constructors
+				value: new LateInit(function*(...args) {
+					let entries = args.map((arg,i)=>["_"+i,arg])
+					entries.push(["tag", Symbol.for(c.name)])
+					return Object.fromEntries(entries)
+				})
 			})
-		}
 		let ret = Huk.invent("R", item.gs)
 		let domain = [self].concat(normalConss.map(c=>({tag: "arrow",
 			domain: c.fields,
 			codomain: mkUse(ret)
 		})
 		))
-		let elimSymbol = symbol+"ᐅelim"
-		mapInsert(this.root.globals, elimSymbol, {
+		mapInsert(this.root.globals, symbol+"ᐅelim", {
 			gs: item.gs.concat([ret]),
 			ty: {tag: "arrow", domain: domain, codomain: mkUse(ret)},
-			value: new LateInit(conssFuns[elimSymbol])
+			value: new LateInit()
 		})
 		break
 	}
@@ -566,14 +563,10 @@ tyck(): boolean {
 		let symbol = this.itemCtx.getToplevelSymbol()
 		let ty = this.normalize(item.retT)
 		this.check(ty)
-
-		let cgs = this.itemCtx.cg.codegen()
-		assertEq(Object.keys(cgs), [symbol])
-
 		mapInsert(this.root.globals, symbol, {
 			gs: [],
 			ty,
-			value: new LateInit(this.jitCompile(cgs[symbol]))
+			value: new LateInit()
 		})
 		break
 	}
@@ -616,14 +609,6 @@ tyck(): boolean {
 				return false
 			}
 		}
-
-		let cgs = this.itemCtx.cg.codegen()
-		assertEq(Object.keys(cgs), [symbol])
-
-		// fill-in the fixture
-		mapGet(this.root.globals, symbol).value.set(
-			this.jitCompile(cgs[symbol])
-		)
 		break
 	}
 
@@ -639,6 +624,15 @@ tyck(): boolean {
 		if (e.constructor === CompileError) throw e
 		throw new CompileError(this.item.span, this.log.join("\n"), undefined, { cause: e })
 	}
+}
+
+addFixtures() {
+	let cgs = this.itemCtx.cg.codegen()
+
+	for (let cgSymbol in cgs)
+		mapGet(this.root.globals, cgSymbol).value.setIfUnsetThen(
+			()=>this.jitCompile(cgs[cgSymbol])
+		)
 }
 }
 
