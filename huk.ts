@@ -496,7 +496,10 @@ private check(ty: any) {
 	}
 }
 
-tyck() {
+// false when typechecking expectedly @Fails
+// true when typechecking succeeds
+// exception upon type error and no @Fails annotations are present
+tyck(): boolean {
 	try {
 	let item = this.item
 	switch (item.tag) {
@@ -601,6 +604,7 @@ tyck() {
 			this.check(codomain)
 		else {
 			let expected = item.annots[0].text
+			assertEq(item.annots[0].name, "Fails")
 			try {
 				this.check(codomain)
 				error("expected error: "+expected)
@@ -609,7 +613,7 @@ tyck() {
 				assertEq(e.message, expected)
 
 				mapRemove(this.root.globals, symbol)
-				break
+				return false
 			}
 		}
 
@@ -630,6 +634,7 @@ tyck() {
 	default:
 		nonExhaustiveMatch(item.tag)
 	}
+	return true
 	} catch (e) {
 		if (e.constructor === CompileError) throw e
 		throw new CompileError(this.item.span, this.log.join("\n"), undefined, { cause: e })

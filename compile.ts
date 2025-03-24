@@ -133,7 +133,7 @@ private analyze(items: Iterable<any>) {
 		for (let item of items) {
 			let itemCtx = new ItemCtx(
 				this.tyck, this.cg, Compiler.makeItemNetwork(), item)
-			itemCtx.tyck.tyck()
+			if (!itemCtx.tyck.tyck()) continue
 			itemCtx.cg.step()
 		}
 
