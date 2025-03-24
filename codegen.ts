@@ -137,7 +137,7 @@ private expr(): string {
 }
 
 // list of key-value pairs to add to the global object
-codegenUncached(): ObjectMap<string> {
+private codegen_(): ObjectMap<string> {
 	try {
 	this.itemCtx.tyck.tyck()
 	let item = this.item
@@ -200,14 +200,7 @@ codegenUncached(): ObjectMap<string> {
 
 codegen(): ObjectMap<string> {
 	return this.itemCtx.network.memoize(
-		"codegen-item", [], this.codegenUncached.bind(this))
-}
-
-step() {
-	let cgs = this.codegen()
-	let aToplevel = Object.entries(cgs).flatMap(
-		([symbol, code]) => ["_fixtures_.", symbol, " = ", code, "\n"]).join("")
-	this.root.push(aToplevel)
+		"codegen-item", [], this.codegen_.bind(this))
 }
 }
 
@@ -217,8 +210,10 @@ export class RootCodegen {
 		`const _fixtures_ = Object.create(null)\n`
 	]
 
-	push(s: string) {
-		this.code.push(s)
+	addToplevels(cgs: ObjectMap<string>) {
+		let toplevels = Object.entries(cgs).flatMap(
+			([symbol, code]) => ["_fixtures_.", symbol, " = ", code, "\n"])
+		this.code.push(...toplevels)
 	}
 
 	getCode(): string {

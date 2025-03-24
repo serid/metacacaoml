@@ -145,7 +145,7 @@ private normalize(tyExpr: {tag: symbol, span: number, arena: any[]}) {
 	//kinda hacky idk
 	nakedCtx.tyck.ctx = [...this.ctx]
 	nakedCtx.tyck.tyck()
-	let cgs = nakedCtx.cg.codegenUncached()
+	let cgs = nakedCtx.cg.codegen()
 	assertEq(Object.keys(cgs), ["_"])
 	let obj = `"use strict";\n` + cgs._
 

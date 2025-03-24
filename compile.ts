@@ -135,7 +135,7 @@ private analyze(items: Iterable<any>) {
 			let itemCtx = new ItemCtx(
 				this.tyck, this.cg, Compiler.makeItemNetwork(), item)
 			if (!itemCtx.tyck.tyck()) continue
-			itemCtx.cg.step()
+			this.cg.addToplevels(itemCtx.cg.codegen())
 			itemCtx.tyck.addFixtures()
 		}
 
