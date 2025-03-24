@@ -118,7 +118,9 @@ private jitCompile(code: string): Function {
 	code = `"use strict";\nreturn ` + code
 	return new Function("_fixtures_", code)(this.root.fixtures)
 	} catch (e) {
-		throw new CompileError(this.item.span, "Obj:"+code, undefined, { cause: e })
+		let log = `Env: ${prettyPrint(this.root.fixtures)}\n` +
+			`Obj: ${code}`
+		throw new CompileError(this.item.span, log, undefined, { cause: e })
 	}
 }
 
@@ -554,7 +556,7 @@ private tyck_(): boolean {
 		))
 		mapInsert(this.root.globals, symbol+"ᐅelim", {
 			gs: item.gs.concat([ret]),
-			ty: {tag: "arrow", domain: domain, codomain: mkUse(ret)},
+			ty: {tag: "arrow", domain, codomain: mkUse(ret)},
 			value: new LateInit()
 		})
 		break
@@ -648,7 +650,7 @@ export class RootTyck {
 		Object.create(null)
 	fixtures: ObjectMap<any> = mapFilterMapProjection(this.globals,
 		(_symbol, entry) => {
-			if (entry.value === null) return null
+			if (entry.value === null || !entry.value.isSet()) return null
 			return entry.value.get()
 		})
 	normalCounter: number = 0

@@ -279,6 +279,10 @@ export class LateInit<T> {
 			this.value = value
 	}
 
+	isSet(): boolean {
+		return this.value !== null
+	}
+
 	get(): T {
 		if (this.value === null)
 			error("value not set yet")
