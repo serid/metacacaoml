@@ -35,6 +35,8 @@ fun Ordering/from-lt-eq('A lt:[A A]Bool eq:[A A]Bool): [A A]Ordering =
 	eq(x y).then(Ordering/Eq)
 	{ . lt(x y).then(Ordering/Lt Ordering/Gt) }
 
+let -1: Int = 0.sub(1)
+
 class Int end
 fun .increment(x:Int): Int = native[|x+1|]
 fun .lt(x:Int y:Int): Bool = Bool/from-native(native[|x<y|])
@@ -44,8 +46,6 @@ fun .add(x:Int y:Int): Int = native[|x+y|]
 fun .sub(x:Int y:Int): Int = native[|x-y|]
 fun .mul(x:Int y:Int): Int = native[|x*y|]
 fun .div(x:Int y:Int): Int = native[|x/y|]
-
-let -1: Int = 0.sub(1)
 
 fun .to-Int(ord:Ordering): Int =
 	Ordering/elim(ord) {. -1} {. 0} {. 1}

@@ -1,9 +1,10 @@
-import { assert, error, nonExhaustiveMatch, range, toString, unSingleton, write } from './util.ts'
+import { ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, ObjectMap, range, toString, unSingleton, write } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Huk, RootTyck } from "./huk.ts"
 import { ItemCodegen, RootCodegen } from "./codegen.ts"
 import { Network } from './flow.ts'
+import { toposort } from './algorithms.ts'
 
 const std = await globalThis.Deno.readTextFile("./std.meml.rs")
 
@@ -25,9 +26,10 @@ export class ItemCtx {
 	tyck: Huk
 	cg: ItemCodegen
 
-	constructor(tyck: RootTyck, cg: RootCodegen | null,
+	constructor(private compiler: Compiler,
+		tyck: RootTyck, cg: RootCodegen | null,
 		public network: Network, private item: any) {
-		this.tyck = new Huk(this, tyck, item)
+		this.tyck = new Huk(this.compiler, this, tyck, item)
 		this.cg = new ItemCodegen(this, cg, tyck, item)
 	}
 
@@ -89,6 +91,11 @@ private logs: string[] = []
 private tyck: RootTyck = new RootTyck()
 private cg: RootCodegen = new RootCodegen()
 
+// key is itemid
+itemCtxOfItemId: ArrayMap<ItemCtx> = []
+// symbol is a global name after mangling
+symbolToItemId: ObjectMap<number> = Object.create(null)
+
 constructor(
 	src: string,
 	private logging: boolean) {
@@ -100,7 +107,13 @@ static makeItemNetwork() {
 		"toplevel-symbols",
 		"codegen-item",
 		"tyck-item",
+		"add-fixtures",
 	])
+}
+
+itemCtxOfSymbol(symbol: string): ItemCtx {
+	let id = mapGet(this.symbolToItemId, symbol)
+	return this.itemCtxOfItemId[id]
 }
 
 log(...xs: any[]) {
@@ -126,17 +139,29 @@ private reportError(e: CompileError) {
 }
 
 compile() {
-	return this.analyze(new Syntax(this.src).syntax())
-}
-
-private analyze(items: Iterable<any>) {
 	try {
+		let items = [...new Syntax(this.src).syntax()]
+
 		for (let item of items) {
 			let itemCtx = new ItemCtx(
-				this.tyck, this.cg, Compiler.makeItemNetwork(), item)
+				this, this.tyck, this.cg, Compiler.makeItemNetwork(), item)
+			for (let symbol of itemCtx.getToplevelSymbols())
+				mapInsert(this.symbolToItemId, symbol, this.itemCtxOfItemId.length)
+			this.itemCtxOfItemId.push(itemCtx)
+		}
+
+		// Typecheck all
+		for (let itemCtx of this.itemCtxOfItemId) {
+			itemCtx.tyck.tyck()
+		}
+
+		// Generate code for all
+		let ctxEdges = (ctx: ItemCtx) =>
+			ctx.tyck.fixtureSymbolDependencies
+				.map(symbol=>mapGet(this.symbolToItemId, symbol))
+		for (let itemCtx of toposort(this.itemCtxOfItemId, ctxEdges)) {
 			if (!itemCtx.tyck.tyck()) continue
 			this.cg.addToplevels(itemCtx.cg.codegen())
-			itemCtx.tyck.addFixtures()
 		}
 
 		this.log(`normalizations count: ` + this.tyck.normalCounter)

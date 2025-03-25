@@ -43,7 +43,11 @@ private log: string[] = []
 // Codegen will be querying the methodname
 private methodSymbolAt: ObjectMap<string> = Object.create(null)
 
+// This item depends on these meml symbols to run at compiletime
+public fixtureSymbolDependencies: string[] = []
+
 constructor(
+	private compiler: Compiler,
 	private itemCtx: ItemCtx,
 	private root: RootTyck, // toplevel tycker
 	private item: any) {}
@@ -142,11 +146,12 @@ private normalize(tyExpr: {tag: symbol, span: number, arena: any[]}) {
 	let args = envv.map(x=>x[1])
 
 	let nakedCtx = new ItemCtx(
-		this.root, null, Compiler.makeItemNetwork(), tyExpr)
+		this.compiler, this.root, null, Compiler.makeItemNetwork(), tyExpr)
 
 	//kinda hacky idk
 	nakedCtx.tyck.ctx = [...this.ctx]
-	nakedCtx.tyck.tyck()
+
+	nakedCtx.tyck.ensureFixtureDependencies()
 	let cgs = nakedCtx.cg.codegen()
 	assertEq(Object.keys(cgs), ["_"])
 	let obj = `"use strict";\n` + cgs._
@@ -342,6 +347,25 @@ private unifyUi(ty1: any, ty2: any) {
 	}
 }
 
+private ensureGlobalTyckedAndInstantiate(symbol: string, msg: string): any {
+	this.fixtureSymbolDependencies.push(symbol)
+
+	let gb = this.root.globals[symbol]
+	ensure: {
+		// short circuit
+		if (gb !== undefined) break ensure
+
+		// try looking in global symbols, if present, request it to be compiled
+		let itemCtx = this.compiler.itemCtxOfSymbol(symbol)
+		assert(itemCtx !== undefined, msg)
+		itemCtx.tyck.tyck()
+
+		gb = this.root.globals[symbol]
+		assert(gb !== undefined)
+	}
+	return this.instantiate(gb.gs, gb.ty)
+}
+
 private infer_() {
 	let insLocation = this.k
 	let ins = this.stepIns()
@@ -363,10 +387,7 @@ private infer_() {
 		if (ix !== -1)
 			return this.ctx[ix].ty
 
-		// try finding a global
-		let gb = this.root.globals[ins.name]
-		if (gb === undefined) error("var not found")
-		return this.instantiate(gb.gs, gb.ty)
+		return this.ensureGlobalTyckedAndInstantiate(ins.name, "var not found")
 	}
 	case Syntax.array: {
 		// if array is empty, element type is a fresh evar, otherwise infer
@@ -391,11 +412,9 @@ private infer_() {
 
 			let methodSymbol = receiver.fullName+"ᐅ"+ins.metName
 			mapInsert(this.methodSymbolAt, insLocation, methodSymbol)
-			let gb = this.root.globals[methodSymbol]
 
-			assert(gb !== undefined,
-				"method not found")
-			fty = this.instantiate(gb.gs, gb.ty)
+			fty = this.ensureGlobalTyckedAndInstantiate(
+				methodSymbol, "method not found")
 			assert(fty.domain.length > 0)
 			this.unifyUi(receiver, fty.domain[0])
 		}
@@ -502,7 +521,7 @@ private check(ty: any) {
 // false when typechecking expectedly @Fails
 // true when typechecking succeeds
 // exception upon type error and no @Fails annotations are present
-private tyck_(): boolean {
+private tyck_(resolve: (_: boolean) => void): boolean {
 	try {
 	let item = this.item
 	switch (item.tag) {
@@ -595,6 +614,8 @@ private tyck_(): boolean {
 			ty: {tag: "arrow", domain, codomain},
 			value: new LateInit()
 		})
+		// Resolve early to allow recursive functions to tyck
+		resolve(true)
 
 		if (item.annots.length === 0)
 			this.check(codomain)
@@ -630,17 +651,35 @@ private tyck_(): boolean {
 }
 
 tyck(): boolean {
-	return this.itemCtx.network.memoize("tyck-item", [],
+	return this.itemCtx.network.memoizeWithResolver("tyck-item", [],
 		this.tyck_.bind(this))
 }
 
-addFixtures() {
-	let cgs = this.itemCtx.cg.codegen()
+// only used for fixture dependencies
+private ensureFixtureDependencies() {
+	this.tyck()
+	for (let symbol of this.fixtureSymbolDependencies)
+		this.compiler.itemCtxOfSymbol(symbol).tyck.addFixtures()
+}
 
+addFixtures_(resolver: (_: null) => void): null {
+	// Resolve early to allow recursive functions
+	// note: if it were to resolve with undefined,
+	// the network would recompute indefinetely, so we use a null singleton
+	resolver(null)
+	this.ensureFixtureDependencies()
+
+	let cgs = this.itemCtx.cg.codegen()
 	for (let cgSymbol in cgs)
 		mapGet(this.root.globals, cgSymbol).value.setIfUnsetThen(
 			()=>this.jitCompile(cgs[cgSymbol])
 		)
+	return null
+}
+
+addFixtures() {
+	this.itemCtx.network.memoizeWithResolver(
+		"add-fixtures", [], this.addFixtures_.bind(this))
 }
 }
 

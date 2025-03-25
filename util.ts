@@ -94,6 +94,8 @@ export function deepEqual(x: any, y: any) {
 	}
 }
 
+export type ArrayMap<A> = Array<A>
+
 export interface ObjectMap<A> { [k: string]: A }
 
 export function mapInsert<A>(o: ObjectMap<A>, key: string | number, value: A) {
@@ -121,7 +123,7 @@ export function mapFilterMapProjection<A, B>(o: ObjectMap<A>, f: (name: string, 
 			let value = Reflect.get(target, key)
 			if (value === undefined) return undefined
 			let out = f(key, value)
-			assert(out !== null, key + " is null")
+			assert(out !== null, key + " is nullish")
 			return out
 		},
 
@@ -213,6 +215,10 @@ export function* view<A>(
 
 export function* zip<A, B>(xs: A[], ys: B[]): Iterable<[A, B]> {
 	for (let i of range(assertEq(xs.length, ys.length))) yield [xs[i], ys[i]]
+}
+
+export function mkArray<A>(length: number, x: A): A[] {
+	return Array(length).fill(x)
 }
 
 // array to iterator
