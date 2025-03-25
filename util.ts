@@ -25,7 +25,7 @@ export function typeof2(o: any) {
 	return typeof o
 }
 
-export function* range(a: number, b?: number, step: number = 1) {
+export function* range(a: number, b?: number, step = 1) {
 	if (b===undefined) {
 		b = a
 		a = 0
@@ -48,16 +48,16 @@ export function toString(o: any) {
 	if (Array.isArray(o)) {
 		if (o.length === 0) return "[]"
 		let r = "[" + prettyPrint(o[0])
-		for (let i of range(1, o.length))
-			r += ", " + prettyPrint(o[i])
+		for (let x of view(o, 1, o.length))
+			r += ", " + prettyPrint(x)
 		return r + "]"
 	}
 	if (typeof o === "object") {
-		let keys = Object.keys(o)
-		if (keys.length === 0) return "{}"
-		let r = `{ ${keys[0]}: ${prettyPrint(o[keys[0]])}`
-		for (let i of range(1, keys.length))
-			r += `, ${keys[i]}: ${prettyPrint(o[keys[i]])}`
+		let entries = Object.entries(o)
+		if (entries.length === 0) return "{}"
+		let r = `{ ${entries[0][0]}: ${prettyPrint(entries[0][1])}`
+		for (let [key, value] of view(entries, 1))
+			r += `, ${key}: ${prettyPrint(value)}`
 		return r + " }"
 	}
 	return o.toString()
@@ -86,7 +86,7 @@ export function deepEqual(x: any, y: any) {
 	switch (true) {
 	case Array.isArray(x):
 		if (x.length !== y.length) return false
-		for (let i of range(x.length))
+		for (let i of indices(x))
 			if (!deepEqual(x[i], y[i])) return false
 		return true
 	default:
@@ -202,6 +202,19 @@ export function last<A>(xs: A[]) {
 	return xs[xs.length-1]
 }
 
+export function indices<A>(xs: A[]) {
+	return range(xs.length)
+}
+
+export function* view<A>(
+	xs: A[], from: number, to = xs.length, step = 1): Iterable<A> {
+	for (let i of range(from, to, step)) yield xs[i]
+}
+
+export function* zip<A, B>(xs: A[], ys: B[]): Iterable<[A, B]> {
+	for (let i of range(assertEq(xs.length, ys.length))) yield [xs[i], ys[i]]
+}
+
 // array to iterator
 export function* makeIt<A>(xs: Iterable<A>) {
 	for (let x of xs) yield x
@@ -214,15 +227,15 @@ export function it(xs: any): Generator<any, void, any> {
 
 export function findUniqueIndex<A>(xs: A[], f: (_: A) => boolean) {
 	let ri = -1
-	for (let i of range(xs.length))
-		if (f(xs[i])) {
+	for (let [i, x] of xs.entries())
+		if (f(x)) {
 			ri = i
 			break
 		}
 	if (ri === -1)
 		return ri
-	for (let i of range(ri + 1, xs.length))
-		if (f(xs[i])) error("not unique")
+	for (let x of view(xs, ri + 1))
+		if (f(x)) error("not unique")
 	return ri
 }
 
