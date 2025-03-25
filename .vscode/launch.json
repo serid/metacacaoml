@@ -1,15 +1,15 @@
 {
-    // C-space for templates.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Launch",
-            "type": "node",
-            "request": "attach",
-            "port": 9229,
+	// C-space for templates.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Launch",
+			"type": "node",
+			"request": "attach",
+			"port": 9229,
 
-            "preLaunchTask": "Deno Debug"
-        }
-    ]
+			"preLaunchTask": "Deno Debug"
+		}
+	]
 }

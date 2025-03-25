@@ -1,15 +1,15 @@
 {
-  "lint": {
-    "exclude": ["./delcont.js"],
-    "rules": {
-      "tags": ["recommended"],
-      "exclude":
-        ["no-explicit-any"
-        , "prefer-const"
-        , "no-ex-assign"
-        , "require-yield"
-        , "ban-types"
-        ]
-    }
-  }
+	"lint": {
+		"exclude": ["./delcont.js"],
+		"rules": {
+			"tags": ["recommended"],
+			"exclude":
+				["no-explicit-any"
+				, "prefer-const"
+				, "no-ex-assign"
+				, "require-yield"
+				, "ban-types"
+				]
+		}
+	}
 }
