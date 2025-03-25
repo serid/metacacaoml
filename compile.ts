@@ -1,4 +1,4 @@
-import { ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, ObjectMap, range, toString, unSingleton, write } from './util.ts'
+import { ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
 import { Huk, RootTyck } from "./huk.ts"
@@ -27,10 +27,10 @@ export class ItemCtx {
 	cg: ItemCodegen
 
 	constructor(private compiler: Compiler,
-		tyck: RootTyck, cg: RootCodegen | null,
+		private rootTyck: RootTyck, cg: RootCodegen | null,
 		public network: Network, private item: any) {
-		this.tyck = new Huk(this.compiler, this, tyck, item)
-		this.cg = new ItemCodegen(this, cg, tyck, item)
+		this.tyck = new Huk(this.compiler, this, rootTyck, item)
+		this.cg = new ItemCodegen(this, cg, rootTyck, item)
 	}
 
 	// symbols introduced by this item
@@ -82,6 +82,45 @@ export class ItemCtx {
 
 	getToplevelSymbol(): string {
 		return unSingleton(this.getToplevelSymbols())
+	}
+
+	// jit compile and close the code with a _fixtures_ object
+	private jitCompile(code: string): Function {
+		try {
+		code = `"use strict";\nreturn ` + code
+		return new Function("_fixtures_", code)(this.rootTyck.fixtures)
+		} catch (e) {
+			let log = `Env: ${prettyPrint(this.rootTyck.fixtures)}\n` +
+				`Obj: ${code}`
+			throw new CompileError(this.item.span, log, undefined, { cause: e })
+		}
+	}
+
+	// only used for fixture dependencies
+	ensureFixtureDependencies() {
+		this.tyck.tyck()
+		for (let symbol of this.tyck.getSymbolicDependencies())
+			this.compiler.itemCtxOfSymbol(symbol).addFixtures()
+	}
+
+	addFixtures_(resolve: (_: null) => void): null {
+		// Resolve early to allow recursive functions
+		// note: if it were to resolve with undefined,
+		// the network would recompute indefinetely, so we use a null singleton
+		resolve(null)
+		this.ensureFixtureDependencies()
+
+		let cgs = this.cg.codegen()
+		for (let cgSymbol in cgs)
+			mapGet(this.rootTyck.globals, cgSymbol).value.setIfUnsetThen(
+				()=>this.jitCompile(cgs[cgSymbol])
+			)
+		return null
+	}
+
+	addFixtures() {
+		this.network.memoizeWithResolver(
+			"add-fixtures", [], this.addFixtures_.bind(this))
 	}
 }
 
@@ -157,7 +196,7 @@ compile() {
 
 		// Generate code for all
 		let ctxEdges = (ctx: ItemCtx) =>
-			ctx.tyck.fixtureSymbolDependencies
+			ctx.tyck.getSymbolicDependencies()
 				.map(symbol=>mapGet(this.symbolToItemId, symbol))
 		for (let itemCtx of toposort(this.itemCtxOfItemId, ctxEdges)) {
 			if (!itemCtx.tyck.tyck()) continue

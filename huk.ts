@@ -43,8 +43,8 @@ private log: string[] = []
 // Codegen will be querying the methodname
 private methodSymbolAt: ObjectMap<string> = Object.create(null)
 
-// This item depends on these meml symbols to run at compiletime
-public fixtureSymbolDependencies: string[] = []
+// This item depends on these meml symbols to run
+private symbolicDependencies: string[] = []
 
 constructor(
 	private compiler: Compiler,
@@ -116,16 +116,8 @@ getMethodSymbolAt(insLocation: number) {
 	return mapGet(this.methodSymbolAt, insLocation)
 }
 
-// jit compile and close the code with a _fixtures_ object
-private jitCompile(code: string): Function {
-	try {
-	code = `"use strict";\nreturn ` + code
-	return new Function("_fixtures_", code)(this.root.fixtures)
-	} catch (e) {
-		let log = `Env: ${prettyPrint(this.root.fixtures)}\n` +
-			`Obj: ${code}`
-		throw new CompileError(this.item.span, log, undefined, { cause: e })
-	}
+getSymbolicDependencies() {
+	return this.symbolicDependencies
 }
 
 // normalization by jit compilation
@@ -151,7 +143,7 @@ private normalize(tyExpr: {tag: symbol, span: number, arena: any[]}) {
 	//kinda hacky idk
 	nakedCtx.tyck.ctx = [...this.ctx]
 
-	nakedCtx.tyck.ensureFixtureDependencies()
+	nakedCtx.ensureFixtureDependencies()
 	let cgs = nakedCtx.cg.codegen()
 	assertEq(Object.keys(cgs), ["_"])
 	let obj = `"use strict";\n` + cgs._
@@ -348,7 +340,7 @@ private unifyUi(ty1: any, ty2: any) {
 }
 
 private ensureGlobalTyckedAndInstantiate(symbol: string, msg: string): any {
-	this.fixtureSymbolDependencies.push(symbol)
+	this.symbolicDependencies.push(symbol)
 
 	let gb = this.root.globals[symbol]
 	ensure: {
@@ -653,33 +645,6 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 tyck(): boolean {
 	return this.itemCtx.network.memoizeWithResolver("tyck-item", [],
 		this.tyck_.bind(this))
-}
-
-// only used for fixture dependencies
-private ensureFixtureDependencies() {
-	this.tyck()
-	for (let symbol of this.fixtureSymbolDependencies)
-		this.compiler.itemCtxOfSymbol(symbol).tyck.addFixtures()
-}
-
-addFixtures_(resolver: (_: null) => void): null {
-	// Resolve early to allow recursive functions
-	// note: if it were to resolve with undefined,
-	// the network would recompute indefinetely, so we use a null singleton
-	resolver(null)
-	this.ensureFixtureDependencies()
-
-	let cgs = this.itemCtx.cg.codegen()
-	for (let cgSymbol in cgs)
-		mapGet(this.root.globals, cgSymbol).value.setIfUnsetThen(
-			()=>this.jitCompile(cgs[cgSymbol])
-		)
-	return null
-}
-
-addFixtures() {
-	this.itemCtx.network.memoizeWithResolver(
-		"add-fixtures", [], this.addFixtures_.bind(this))
 }
 }
 
