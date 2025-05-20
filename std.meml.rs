@@ -1,9 +1,9 @@
 # MetaCaCaoML stdlib
 class Void end
-class Unit
-| C()
+class Iota
+| Iota()
 end
-fun anyways(-:@any): Unit = Unit/C()
+fun anyways(-:@any): Iota = Iota/Iota()
 fun seq('A -:@any other:A): A = other
 
 fun id('A x:A): A = x
@@ -14,7 +14,7 @@ fun compose2('A 'B 'C 'D g:[C]D f:[A B]C): [A B]D =
 	fun() λ x y. g(f(x y))
 
 fun let('A 'B x:A f:[A]B): B = f(x)
-fun write('A x:A): Unit = anyways(
+fun write('A x:A): Iota = anyways(
 	native[|console.log(x)|])
 fun error(m:String): @any =
 	native[|(()=>{throw new Error(m)})()|]
@@ -27,6 +27,8 @@ fun Bool/from-native(b:@any): Bool =
 	native[|b?yield*_fixtures_.BoolᐅTrue():yield*_fixtures_.BoolᐅFalse()|]
 fun .then('A b:Bool onTrue:[]A onFalse:[]A): A =
 	Bool/elim(b onFalse onTrue)
+fun .choose('A b:Bool onTrue:A onFalse:A): A =
+	Bool/elim(b) { . onFalse } { . onTrue }
 
 class Ordering
 | Lt()
@@ -93,9 +95,9 @@ class Box 'A
 end
 fun .get('A self:Box(A)): A =
 	native[|self._0|]
-fun .set('A self:Box(A) x:A): Unit =
+fun .set('A self:Box(A) x:A): Iota =
 	anyways(native[|self._0 = x|])
-fun .modify('A self:Box(A) f:[A]A): Unit =
+fun .modify('A self:Box(A) f:[A]A): Iota =
 	self.set(f(self.get()))
 
 class Option 'A
@@ -118,7 +120,7 @@ fun .length('A xs:Array(A)): Int =
 	native[|xs.length|]
 fun .get('A xs:Array(A) i:Int): A =
 	native[|xs[i]|]
-fun .push('A xs:Array(A) x:A): Unit =
+fun .push('A xs:Array(A) x:A): Iota =
 	anyways(native[|xs.push(x)|])
 fun .shallow-copy('A xs:Array(A)): Array(A) =
 	native[|[...xs]|]
@@ -127,7 +129,7 @@ fun .sorted('A xs:Array(A) cmp:[A A]Ordering): Array(A) =
 	native[|[...xs].sort((x,y)=>cmp(x,y).next().value)|]
 fun .slice('A xs:Array(A) i:Int j:Int): Array(A) =
 	native[|xs.slice(i, j)|]
-fun .reverse('A xs:Array(A)): Unit =
+fun .reverse('A xs:Array(A)): Iota =
 	anyways(native[|xs.reverse()|])
 
 fun .last('A xs:Array(A)): Option(A) =
@@ -147,8 +149,8 @@ class Iter 'A
 end
 fun .unpack('A i:Iter(A)): []Option(A) =
 	Iter/elim(i id)
-fun .for-each('A i:Iter(A) f:[A]Unit): Unit = Option/elim(i.unpack()())
-	{ . Unit/C() }
+fun .for-each('A i:Iter(A) f:[A]Iota): Iota = Option/elim(i.unpack()())
+	{ . Iota/Iota() }
 	{ x. f(x); i.for-each(f) }
 fun .to-Array('A i:Iter(A)): Array(A) =
 	# todo: buff up type inference to allow `as` here

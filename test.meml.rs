@@ -11,8 +11,8 @@ let -check-let1: Type = Int
 let -check-let2: -check-let1 = 1
 
 # Compile-time assertion of a bool
-fun test(b:Bool): Type = b.then() { . Unit } { . Void }
-let -check-precedence: test(1 + 2 * 3 + 4 == 11) = Unit/C()
+fun test(b:Bool): Type = b.choose(Iota Void)
+let -check-precedence: test(1 + 2 * 3 + 4 == 11) = Iota/Iota()
 
 # Adds constructors and a matching function to global scope
 # Matching function Option/elim analyses the object in first parameter and chooses one of lambdas passed to it, while giving it the object's fields
@@ -24,7 +24,7 @@ fun compareTypes(x:Type y:Type): Ordering =
 let -tuple-of-stuffs: make-tuple-type(@[Int String Bool].sorted(compareTypes)) =
 	(Bool/True() 1 "string here")
 
-fun main(): Unit =
+fun main(): Iota =
 let(@[1 2 3]) λarray.
 write(array);
 let(Array/to-Iter(array)) λiterator.
