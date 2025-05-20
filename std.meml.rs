@@ -43,7 +43,7 @@ infix left at 100. "+" = ".add"
 
 class Int end
 let -1: Int = 0.sub(1)
-fun .increment(x:Int): Int = native[|x+1|]
+fun .increment(x:Int): Int = x + 1
 fun .lt(x:Int y:Int): Bool = Bool/from-native(native[|x<y|])
 fun .eq(x:Int y:Int): Bool = Bool/from-native(native[|x===y|])
 let Int/cmp: [Int Int]Ordering = Ordering/from-lt-eq(Int/lt Int/eq)

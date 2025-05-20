@@ -20,6 +20,11 @@ export function assertEq(x: any, y: any) {
 	return x
 }
 
+export function assertDefined<A>(x: A | undefined): A {
+	assert(x !== undefined)
+	return x
+}
+
 export function typeof2(o: any) {
 	if (Array.isArray(o)) return "array"
 	return typeof o

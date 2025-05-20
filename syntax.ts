@@ -1,12 +1,17 @@
 import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
-import { error, assert, assertL, fuel, range, last, makeFraction, all } from './util.ts'
+import { error, assert, assertL, fuel, range, last, makeFraction, all, any, unSingleton, assertDefined, assertEq } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
 	if (w.length > s.length - i) return false
 	for (let j = 0; j < w.length; j++)
 		if (s[i + j] != w[j]) return false
 	return true
+}
+
+function unsignalNaN(x: number | symbol, message: string) {
+	assert(x !== Symbol.for("signaling-NaN"), message)
+	return <number>x
 }
 
 type InfixDecl = {
@@ -222,7 +227,7 @@ private bindings() {
 }
 
 // returns an array of instructions
-private expr(): any[] {
+private exprNoInfix(): any[] {
 	let span = this.i
 	let insQueue = []
 	if (this.tryWord('"')) {
@@ -319,6 +324,79 @@ private expr(): any[] {
 	break
 	} // end postfix loop
 	return insQueue
+}
+
+private static shuntingYardSpill(outputStack: any[][],
+	operatorStack: {span:number, decl:InfixDecl}[]) {
+	let op = assertDefined(operatorStack.pop())
+	let right = assertDefined(outputStack.pop())
+	let left = assertDefined(outputStack.pop())
+
+	// arrange a function call around `left` in its buffer
+	let inss = left
+	if (op.decl.isMethod) {
+		// blit "app+metName", [left], [right] and "endapp"
+		inss.unshift({tag:Syntax.app, span:op.span, metName:op.decl.replacement})
+	} else {
+		// blit "app", "use", [left], [right] and "endapp"
+		inss.unshift({tag:Syntax.app, span:op.span, metName:null},
+			{tag:Syntax.use, span:op.span, name:op.decl.replacement})
+	}
+	//left stays between app and right
+	inss.push(...right)
+	inss.push({tag:Syntax.endapp, span:last(right).span})
+
+	outputStack.push(inss)
+}
+
+// returns an array of instructions
+private expr(): any[] {
+	let first = this.exprNoInfix()
+
+	// Try binary operators
+	// Employ the shunting yard algorithm where output stack items are
+	// fully baked instruction sequences
+	let outputStack: any[][] = [first]
+	let operatorStack: {span:number, decl:InfixDecl}[] = []
+	while (true) {
+		let span = this.i
+		let decl = this.infixDecls.find(
+			infixDecl => this.tryWord(infixDecl.symbols))
+		if (decl === undefined) break
+
+		let strength = unsignalNaN(decl.strength, "operator precedence was NaN")
+
+		// If new operator has lower precedence then operator TOS,
+		// spill stack to output
+		while (operatorStack.length > 0) {
+			let tos = last(operatorStack).decl
+			let tosStrength = any(tos.strength)
+			if (tosStrength < strength) break
+
+			// Handle associativity
+			if (tosStrength === strength) {
+				// todo: there are 9 possible combinations of associativity
+				// figure out how to resolve them
+				assertEq(tos.associativity, decl.associativity)
+				if (tos.associativity === "none")
+					error("both infix operators are non-associative")
+				if (tos.associativity === "right") break
+				// left associative operators proceed to spilling
+			}
+
+			Syntax.shuntingYardSpill(outputStack, operatorStack)
+		}
+
+		operatorStack.push({span, decl})
+
+		outputStack.push(this.exprNoInfix())
+	}
+
+	// Spill remnants
+	while (operatorStack.length > 0)
+		Syntax.shuntingYardSpill(outputStack, operatorStack)
+
+	return unSingleton(outputStack)
 }
 
 private toplevel() {
