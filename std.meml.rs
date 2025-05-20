@@ -1,9 +1,10 @@
 # MetaCaCaoML stdlib
+class Void end
 class Unit
 | C()
 end
 fun anyways(-:@any): Unit = Unit/C()
-fun and('A -:@any other:A): A = other
+fun seq('A -:@any other:A): A = other
 
 fun id('A x:A): A = x
 fun fun('A f:A): A = f
@@ -39,10 +40,30 @@ fun Ordering/from-lt-eq('A lt:[A A]Bool eq:[A A]Bool): [A A]Ordering =
 fun .to-Int(ord:Ordering): Int =
 	Ordering/elim(ord) { . -1} { . 0} { . 1}
 
-infix left at 100. "+" = ".add"
+infix left at 100. "*" = ".mul"
+infix left at 100. "/" = ".div"
+infix left at 100. "%" = ".rem"
+
+infix left at 75. "+" = ".add"
+infix left at 75. "-" = ".sub"
+
+infix at 60. "<=>" = ".cmp"
+
+infix at 50. "==" = ".eq"
+infix at 50. "!=" = ".neq"
+infix at 50. "<" = ".lt"
+infix at 50. "<=" = ".le"
+infix at 50. ">" = ".gt"
+infix at 50. ">=" = ".ge"
+
+#infix left at 25. "&&" = ".and"
+#infix left at 20. "||" = ".or"
+
+infix right at .0 ";" = "seq"
+infix right at .0 "as" = "let"
 
 class Int end
-let -1: Int = 0.sub(1)
+let -1: Int = 0 - 1
 fun .increment(x:Int): Int = x + 1
 fun .lt(x:Int y:Int): Bool = Bool/from-native(native[|x<y|])
 fun .eq(x:Int y:Int): Bool = Bool/from-native(native[|x===y|])
@@ -51,6 +72,7 @@ fun .add(x:Int y:Int): Int = native[|x+y|]
 fun .sub(x:Int y:Int): Int = native[|x-y|]
 fun .mul(x:Int y:Int): Int = native[|x*y|]
 fun .div(x:Int y:Int): Int = native[|x/y|]
+fun .rem(x:Int y:Int): Int = native[|x%y|]
 
 class String end
 fun .lt(x:String y:String): Bool = Bool/from-native(native[|x<y|])
@@ -101,7 +123,7 @@ fun .push('A xs:Array(A) x:A): Unit =
 fun .shallow-copy('A xs:Array(A)): Array(A) =
 	native[|[...xs]|]
 fun .sorted('A xs:Array(A) cmp:[A A]Ordering): Array(A) =
-	let(compose2(Ordering/to-Int cmp)) λ cmp.
+	compose2(Ordering/to-Int cmp) as fun() λ cmp.
 	native[|[...xs].sort((x,y)=>cmp(x,y).next().value)|]
 fun .slice('A xs:Array(A) i:Int j:Int): Array(A) =
 	native[|xs.slice(i, j)|]
@@ -109,13 +131,13 @@ fun .reverse('A xs:Array(A)): Unit =
 	anyways(native[|xs.reverse()|])
 
 fun .last('A xs:Array(A)): Option(A) =
-	xs.length().eq(0).then()
+	(xs.length() == 0).then()
 	{ . Option/None() }
-	{ . Option/Some(xs.get(xs.length().sub(1))) }
+	{ . Option/Some(xs.get(xs.length() - 1)) }
 fun .init('A xs:Array(A)): Option(Array(A)) =
-	xs.length().eq(0).then()
+	(xs.length() == 0).then()
 	{ . Option/None() }
-	{ . Option/Some(xs.slice(0 xs.length().sub(1))) }
+	{ . Option/Some(xs.slice(0 xs.length() - 1)) }
 fun .unsnoc('A xs:Array(A)): Option(Pair(Array(A) A)) =
 	xs.init().map() λ init.
 	(init xs.last().unwrap())
@@ -127,21 +149,22 @@ fun .unpack('A i:Iter(A)): []Option(A) =
 	Iter/elim(i id)
 fun .for-each('A i:Iter(A) f:[A]Unit): Unit = Option/elim(i.unpack()())
 	{ . Unit/C() }
-	{ x. and(f(x) i.for-each(f)) }
+	{ x. f(x); i.for-each(f) }
 fun .to-Array('A i:Iter(A)): Array(A) =
+	# todo: buff up type inference to allow `as` here
 	let(@[]) λ xs.
-	let(i.for-each() λ x.
+	i.for-each() { x.
 		xs.push(x)
-	) λ -.
+	};
 	xs
 fun .to-Iter('A xs:Array(A)): Iter(A) =
 	let(Box/New(0)) λ i.
 	Iter/New() λ .
 	let(i.get()) λ iv.
-	Bool/elim(iv.lt(xs.length()))
+	Bool/elim(iv < xs.length())
 	{ . Option/None() }
-	{ . let(xs.get(iv)) λ elem.
-		and(i.set(iv.increment()) Option/Some(elem)) }
+	{ . xs.get(iv) as fun() λ elem.
+		i.set(iv.increment()); Option/Some(elem) }
 fun .map('A 'B i:Iter(A) f:[A]B): Iter(B) =
 	Iter/New() λ .
 	Option/elim(i.unpack()())
@@ -153,8 +176,9 @@ fun .name(t:Type): String = native[|t.fullName|]
 
 fun make-tuple-type(ts:Array(Type)): Type =
 	Pair/elim(ts.unsnoc().unwrap()) λ init last.
-	let(init.reverse()) λ -.
+	init.reverse() as fun() λ -.
 	let(Box/New(last)) λ acc.
-	let(init.to-Iter().for-each()
-		{ t. acc.modify() λ x. Pair(t x) }) λ -.
+	init.to-Iter().for-each() { t.
+		acc.modify() λ x. Pair(t x)
+	};
 	acc.get()
