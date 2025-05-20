@@ -98,6 +98,10 @@ export type ArrayMap<A> = Array<A>
 
 export interface ObjectMap<A> { [k: string]: A }
 
+export function mapNew<A>(props?: object): ObjectMap<A> {
+	return props !== undefined ? Object.setPrototypeOf(props, null) : Object.create(null)
+}
+
 export function mapInsert<A>(o: ObjectMap<A>, key: string | number, value: A) {
 	assert(["string","number"].includes(typeof key))
 	assert(o[key] === undefined, "key already present: "+key)
@@ -199,8 +203,18 @@ export function first<A>(xs: A[]) {
 	return xs[0]
 }
 
+export function firstStr(xs: string) {
+	assert(xs.length > 0, "string is empty")
+	return xs[0]
+}
+
 export function last<A>(xs: A[]) {
 	assert(xs.length > 0, "array is empty")
+	return xs[xs.length-1]
+}
+
+export function lastStr(xs: string) {
+	assert(xs.length > 0, "string is empty")
 	return xs[xs.length-1]
 }
 
