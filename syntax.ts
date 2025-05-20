@@ -1,6 +1,6 @@
 import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
-import { error, assert, assertL, fuel, range, last } from './util.ts'
+import { error, assert, assertL, fuel, range, last, makeFraction, all } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
 	if (w.length > s.length - i) return false
@@ -9,6 +9,22 @@ function isPrefix(s: string, i: number, w: string) {
 	return true
 }
 
+type InfixDecl = {
+	symbols: string,
+	associativity: string,
+	strength: number | symbol,
+	isMethod: boolean,
+	replacement: string
+}
+
+let identAnlautRule = /[a-zA-Z\-]/
+let identInlautRule = /[a-zA-Z0-9\-/]/
+
+// let infixOperatorAnlautRule =
+//	/[\p{General_Category=Symbol}\p{General_Category=Punctuation}]/u
+let infixOperatorInlautRule = /\S/
+// let infixOperatorAuslautRule = infixOperatorAnlautRule
+
 export class Syntax {
 static strlit = Symbol("strlit")
 static fun = Symbol("fun")
@@ -16,8 +32,6 @@ static native = Symbol("native")
 static app = Symbol("app")
 static endapp = Symbol("endapp")
 static use = Symbol("use")
-static endfun = Symbol("endfun")
-static cls = Symbol("cls")
 static applam = Symbol("applam")
 static let = Symbol("let")
 static arrow = Symbol("arrow")
@@ -27,8 +41,11 @@ static int = Symbol("int")
 static nakedfun = Symbol("naked-fun")
 static array = Symbol("array")
 static endarray = Symbol("endarray")
+static cls = Symbol("cls")
+static infixdecl = Symbol("infix-decl")
 
 private i: number = 0
+private infixDecls: InfixDecl[] = []
 
 constructor(private s: string) {}
 
@@ -99,21 +116,55 @@ private tryWhitespace() {
 	}
 }
 
-private ident() {
-	let anlautRule = /[a-zA-Z\-]/
-	let inlautRule = /[a-zA-Z0-9\-/]/
-	let id = ""
-	if (!this.notPastEof() ||
-		!anlautRule.test(this.peekChar()))
-		return null
+private uintNoWhiteSpace() {
+	if (!/[0-9]/.test(this.peekChar())) return null
+	let n = 0
+	do {
+		n *= 10
+		n += parseInt(this.char())
+	} while (this.notPastEof() && /[0-9]/.test(this.peekChar()))
+	return n
+}
+
+private uint() {
+	let n = this.uintNoWhiteSpace()
+	this.tryWhitespace()
+	return n
+}
+
+// parses a double-precision floating-point number
+private ieee754() {
+	if (this.tryWord("NaN") || this.tryWord("qNaN"))
+		return NaN
+	if (this.tryWord("sNaN"))
+		return Symbol.for("signaling-NaN")
+
+	let sign = this.tryWord("-") ? -1 : 1
+	if (this.tryWord("∞"))
+		return sign * Infinity
+	let int = this.uintNoWhiteSpace() ?? 0
+	this.assertWord(".")
+	let fraction = this.uint() ?? 0
+	return sign * (int + makeFraction(fraction))
+}
+
+private charactersWhile(r: RegExp): string {
+	let s = ""
 	while (this.notPastEof()) {
 		let c = this.peekChar()
-		if (!inlautRule.test(c))
-			break
-		id += c
+		if (!r.test(c)) break
+		s += c
 		this.i++
 	}
 	this.tryWhitespace()
+	return s
+}
+
+private ident() {
+	if (!this.notPastEof() ||
+		!identAnlautRule.test(this.peekChar()))
+		return null
+	let id = this.charactersWhile(identInlautRule)
 	return mangle(id)
 }
 
@@ -179,12 +230,7 @@ private expr(): any[] {
 	} else if (this.tryWord("native[|")) {
 		insQueue.push({tag: Syntax.native, span, code: this.stringLiteral("|]")})
 	} else if (/[0-9]/.test(this.peekChar())) {
-		let n = 0
-		do {
-			n *= 10
-			n += parseInt(this.char())
-		} while (this.notPastEof() && /[0-9]/.test(this.peekChar()))
-		insQueue.push({tag: Syntax.int, span, data: n})
+		insQueue.push({tag: Syntax.int, span, data: this.uint()})
 		this.tryWhitespace()
 	} else if (this.tryWord("@[")) {
 		insQueue.push({tag:Syntax.array, span})
@@ -327,7 +373,36 @@ private toplevel() {
 
 		let arena = this.expr()
 		return {tag: Syntax.fun, span, isMethod,name, gs, bs, retT, annots, arena}
-	} else error("expected toplevel")
+	} else if (this.tryWord("infix")) {
+		let associativity = "none"
+		if (this.tryWord("left")) associativity = "left"
+		if (this.tryWord("right")) associativity = "right"
+		this.assertWord("at")
+		let strength = this.ieee754()
+
+		this.assertWord('"')
+		let symbols = this.stringLiteral('"')
+		this.assertWord("=")
+
+		this.assertWord('"')
+		let isMethod = this.tryWord(".")
+		let replacement = this.stringLiteral('"')
+
+		// assert(infixOperatorAnlautRule.test(firstStr(symbols)),
+		// 	"an infix operator shall start with a symbol")
+		assert(all(symbols, c => infixOperatorInlautRule.test(c)),
+			"an infix operator shall contain no whitespace")
+		// assert(infixOperatorAuslautRule.test(lastStr(symbols)),
+		// 	"an infix operator shall end with a symbol")
+
+		replacement = mangle(replacement)
+		let infix = {symbols, associativity, strength, isMethod, replacement}
+		this.infixDecls.push(infix)
+
+		return {tag: Syntax.infixdecl, span, ...infix}
+	}
+	else
+		error("expected toplevel")
 }
 
 *syntax() {

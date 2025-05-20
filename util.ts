@@ -259,6 +259,11 @@ export function findUniqueIndex<A>(xs: A[], f: (_: A) => boolean) {
 	return ri
 }
 
+export function all<A>(i: Iterable<A>, f: (_: A) => boolean) {
+	for (let x of i) if (!f(x)) return false
+	return true
+}
+
 export function* map<A, B>(i: Iterable<A>, f: (_: A) => B) {
 	for (let x of i) yield f(x)
 }
@@ -300,6 +305,14 @@ export function forEach<A>(i: Iterable<A>, f: (_: A) => void) {
 export function* bind(i: any, k: any) {
 	for (let x of i)
 		for (let y of k(x)) yield y
+}
+
+// 12345 -> 0.12345
+export function makeFraction(x: number /*integer*/) {
+	if (x === 0) return 0.0
+	let numDigits = Math.floor(Math.log10(x)) + 1
+	let scaled = Math.pow(10, numDigits)
+	return x / scaled
 }
 
 export class LateInit<T> {

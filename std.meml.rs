@@ -39,6 +39,8 @@ fun Ordering/from-lt-eq('A lt:[A A]Bool eq:[A A]Bool): [A A]Ordering =
 fun .to-Int(ord:Ordering): Int =
 	Ordering/elim(ord) { . -1} { . 0} { . 1}
 
+infix left at 100. "+" = ".add"
+
 class Int end
 let -1: Int = 0.sub(1)
 fun .increment(x:Int): Int = native[|x+1|]

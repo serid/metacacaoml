@@ -632,6 +632,8 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 	case Syntax.nakedfun:
 		this.check(useType)
 		break
+	case Syntax.infixdecl:
+		break
 	default:
 		nonExhaustiveMatch(item.tag)
 	}

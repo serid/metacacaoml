@@ -188,6 +188,8 @@ private codegen_(): ObjectMap<string> {
 		this.code.push(`  return ${this.expr()}`)
 		mapInsert(toplevels, "_", this.unshiftCode())
 		break
+	case Syntax.infixdecl:
+		break
 	default:
 		nonExhaustiveMatch(item.tag)
 	}

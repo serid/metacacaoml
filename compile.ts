@@ -69,6 +69,8 @@ export class ItemCtx {
 		case Syntax.nakedfun:
 			error("naked fun has no toplevel symbols")
 			break // to please the linter
+		case Syntax.infixdecl:
+			return []
 		default:
 			nonExhaustiveMatch(item.tag)
 		}
