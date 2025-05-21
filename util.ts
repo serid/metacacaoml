@@ -45,7 +45,7 @@ export function prettyPrint(o: any) {
 	return toString(o)
 }
 
-export function toString(o: any) {
+export function toString(o: any): string {
 	if (o === null)
 		return "null"
 	if (o === undefined)

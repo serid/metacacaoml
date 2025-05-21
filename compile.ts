@@ -215,3 +215,76 @@ compile() {
 	}
 }
 }
+
+function showExpr0(arena: any[], boxI: number[], builder: string[]) {
+	let ins = arena[boxI[0]]
+	boxI[0]++
+	switch (ins.tag) {
+	case Syntax.strlit:
+		builder.push(`"${ins.data}"`)
+		break
+	case Syntax.native:
+		builder.push(`[|${ins.code}|]`)
+		break
+	case Syntax.int:
+		builder.push(toString(ins.data))
+		break
+	case Syntax.array:
+		builder.push("@[")
+		if (arena[boxI[0]].tag!==Syntax.endarray)
+			showExpr0(arena, boxI, builder)
+		while (arena[boxI[0]].tag!==Syntax.endarray) {
+			builder.push(" ")
+			showExpr0(arena, boxI, builder)
+		}
+		boxI[0]++
+		builder.push("]")
+		break
+	case Syntax.any:
+		builder.push("@any")
+		break
+	case Syntax.arrow:
+		builder.push("[")
+		if (arena[boxI[0]].tag!==Syntax.endarrow)
+			showExpr0(arena, boxI, builder)
+		while (arena[boxI[0]].tag!==Syntax.endarrow) {
+			builder.push(" ")
+			showExpr0(arena, boxI, builder)
+		}
+		boxI[0]++
+		builder.push("]")
+		showExpr0(arena, boxI, builder)
+		break
+	case Syntax.use:
+		builder.push(ins.name)
+		break
+	case Syntax.app:
+		showExpr0(arena, boxI, builder)
+		if (ins.metName !== null)
+			builder.push(".", ins.metName)
+		builder.push("(")
+		if (![Syntax.endapp, Syntax.applam].includes(arena[boxI[0]].tag))
+			showExpr0(arena, boxI, builder)
+		while (![Syntax.endapp, Syntax.applam].includes(arena[boxI[0]].tag)) {
+			builder.push(" ")
+			showExpr0(arena, boxI, builder)
+		}
+		builder.push(")")
+		while (arena[boxI[0]].tag===Syntax.applam) {
+			builder.push(" { ", arena[boxI[0]].ps.join(" "), ". ")
+			boxI[0]++
+			showExpr0(arena, boxI, builder)
+			builder.push(" }")
+		}
+		boxI[0]++
+		break
+	default:
+		nonExhaustiveMatch(ins.tag)
+	}
+}
+
+export function showExpr(arena: any[], i: number) {
+	let builder = []
+	showExpr0(arena, [i], builder)
+	return builder.join("")
+}

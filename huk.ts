@@ -1,7 +1,7 @@
 import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view } from './util.ts'
 
 import { Syntax } from "./syntax.ts"
-import { CompileError, Compiler, ItemCtx } from './compile.ts'
+import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
 
 function showType(ty: any) {
 	if (ty===undefined||ty===null) return String(ty)
@@ -471,9 +471,10 @@ private infer_() {
 
 private infer() {
 	try {
-		this.enterTyping(`|- _ => ?`)
+		let pretty = showExpr(this.item.arena, this.k)
+		this.enterTyping(`|- ${pretty} => ?`)
 		let ty = this.infer_()
-		this.exitTyping(`-| _ => ${showType(ty)}`)
+		this.exitTyping(`-| ${pretty} => ${showType(ty)}`)
 		return ty
 	} catch (e) {
 		if (e.constructor === CompileError) throw e
