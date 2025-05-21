@@ -292,13 +292,17 @@ private exprNoInfix(): any[] {
 		metName = this.assertIdent()
 	}
 
-	if (this.tryWord("(")) {
+	// try parsing a function application
+	// lambdas don't need round parentheses ()
+	if (this.notPastEof() && "(λ{".includes(this.peekChar())) {
 		insQueue.unshift({tag: Syntax.app, span, metName})
+		metName = null
 		span = this.i
-		while (!this.tryWord(")")) {
-			insQueue.push(...this.expr())
-			span = this.i
-		}
+		if (this.tryWord("("))
+			while (!this.tryWord(")")) {
+				insQueue.push(...this.expr())
+				span = this.i
+			}
 		while (true) {
 			let span2 = this.i
 			if (this.tryWord("λ")) {
@@ -321,6 +325,8 @@ private exprNoInfix(): any[] {
 		insQueue.push({tag: Syntax.endapp, span})
 		continue
 	}
+
+	assert(metName === null, "missing arguments after method name")
 	break
 	} // end postfix loop
 	return insQueue
