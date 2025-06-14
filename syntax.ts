@@ -234,9 +234,15 @@ private exprNoInfix(): any[] {
 		insQueue.push({tag: Syntax.strlit, span, data: this.stringLiteral('"')})
 	} else if (this.tryWord("native[|")) {
 		insQueue.push({tag: Syntax.native, span, code: this.stringLiteral("|]")})
+	// } else if ("λ{".includes(this.peekChar())) {
+	// 	let isEmbraced = this.char() === "{"
+	// 	this.tryWhitespace()
+	// 	let ps = this.idents(".")
+	// 	insQueue.push({tag: Syntax.lam, span, ps, body: this.expr()})
+	// 	if (isEmbraced) this.assertWord("}")
+	// 	return insQueue
 	} else if (/[0-9]/.test(this.peekChar())) {
 		insQueue.push({tag: Syntax.int, span, data: this.uint()})
-		this.tryWhitespace()
 	} else if (this.tryWord("@[")) {
 		insQueue.push({tag:Syntax.array, span})
 		span = this.i
@@ -245,7 +251,6 @@ private exprNoInfix(): any[] {
 			span = this.i
 		}
 		insQueue.push({tag:Syntax.endarray, span})
-		this.tryWhitespace()
 	} else if (this.tryWord("(")) {
 		span = this.i
 		let subexprs = []
@@ -303,24 +308,15 @@ private exprNoInfix(): any[] {
 				insQueue.push(...this.expr())
 				span = this.i
 			}
-		while (true) {
+		while (this.notPastEof() && "λ{".includes(this.peekChar())) {
 			let span2 = this.i
-			if (this.tryWord("λ")) {
-				let ps = this.idents(".")
-				insQueue.push({tag: Syntax.applam, span: span2, ps})
-				insQueue.push(...this.expr())
-				span = this.i
-				continue
-			}
-			if (this.tryWord("{")) {
-				let ps = this.idents(".")
-				insQueue.push({tag: Syntax.applam, span: span2, ps})
-				insQueue.push(...this.expr())
-				this.assertWord("}")
-				span = this.i
-				continue
-			}
-			break
+			let isEmbraced = this.char() === "{"
+			this.tryWhitespace()
+			let ps = this.idents(".")
+			insQueue.push({tag: Syntax.applam, span: span2, ps})
+			insQueue.push(...this.expr())
+			if (isEmbraced) this.assertWord("}")
+			span = this.i
 		}
 		insQueue.push({tag: Syntax.endapp, span})
 		continue
