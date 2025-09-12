@@ -86,6 +86,7 @@ private showCtx() {
 		case "var": return `${x.name}: ${showType(x.ty)}`
 		case "evar": return `?${x.name}`
 		case "esolve": return `?${x.name} = ${showType(x.solution)}`
+		case "mark": return `m${x.id}`
 		default: return prettyPrint(x)
 		}
 	})
@@ -443,6 +444,15 @@ private infer_() {
 				this.solveEvarTo(par.name, newPar)
 				par = newPar
 			}
+
+			// Introduce a marker to stack to clean up everything after it when
+			// body tyck concludes. ID is index of instruction that introduces lambda
+			let id = this.k
+			this.ctx.push({
+				tag: "mark",
+				id
+			})
+
 			for (let [p, subpar] of zip(ps, par.domain)) {
 				this.ctx.push({
 					tag: "var",
@@ -451,13 +461,15 @@ private infer_() {
 				})
 			}
 			this.check(par.codomain)
-			for (let name of ps) {
-				let ix = this.ctx.findLastIndex(x =>
-					x.tag === "var" &&
-					x.name === name)
-				assert(ix >= 0) // invariant
-				this.ctx.splice(ix, 1)
-			}
+			
+			// Remove from context the prepared marker and everything after it
+			// including vars and body tyck remnants
+			// Evars introduced for arrow remain
+			let ix = this.ctx.findLastIndex(x =>
+				x.tag === "mark" &&
+				x.id === id)
+			assert(ix >= 0) // invariant
+			this.ctx.splice(ix, this.ctx.length - ix)
 		}
 
 		assertEq(this.stepIns().tag, Syntax.endapp) // invariant

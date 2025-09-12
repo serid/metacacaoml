@@ -236,6 +236,12 @@ export function* zip<A, B>(xs: A[], ys: B[]): Iterable<[A, B]> {
 	for (let i of range(assertEq(xs.length, ys.length))) yield [xs[i], ys[i]]
 }
 
+export function* enumerate<A>(i: Iterable<A>): Generator<[number, A], void, any> {
+	let index = 0
+	for (let x of i)
+		yield [index++, x]
+}
+
 export function mkArray<A>(length: number, x: A): A[] {
 	return Array(length).fill(x)
 }
