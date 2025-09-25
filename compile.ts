@@ -224,7 +224,7 @@ function showExpr0(arena: any[], boxI: number[], builder: string[]) {
 		builder.push(`"${ins.data}"`)
 		break
 	case Syntax.native:
-		builder.push(`[|${ins.code}|]`)
+		builder.push(`native[|${ins.code}|]`)
 		break
 	case Syntax.int:
 		builder.push(toString(ins.data))

@@ -3,6 +3,10 @@ import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLa
 import { Syntax } from "./syntax.ts"
 import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
 
+//! Implements typechecking using an algorithm from
+//! https://arxiv.org/abs/1306.6032
+//! simplified to omit higher-rank polymorphism
+
 function showType(ty: any) {
 	if (ty===undefined||ty===null) return String(ty)
 	switch (ty.tag) {
@@ -235,14 +239,13 @@ private substitute(ty: any) {
 	case "euse": {
 		let ix = findUniqueIndex(this.ctx, x=>
 			x.tag === "esolve" && x.name === ty.name)
+		if (ix !== -1)
+			return this.substitute(this.ctx[ix].solution)
 
 		// evar not solved, but is it even declared?
-		if (ix === -1)
-			ix = findUniqueIndex(this.ctx, x=>
-				x.tag === "evar" && x.name === ty.name)
+		ix = findUniqueIndex(this.ctx, x => x.tag === "evar" && x.name === ty.name)
 		assert(ix !== -1, "evar not found") // invariant
-		return this.ctx[ix].solution !== undefined ? this.ctx[ix].solution :
-			ty
+		return ty
 	}
 	case "cons":
 		return {tag: "cons",
