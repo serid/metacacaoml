@@ -156,6 +156,11 @@ export function setContains(o: ObjectSet, key: string) {
 	return o[key] !== undefined
 }
 
+export enum Dexterity {	Left, Right }
+export function flipHands(dex: Dexterity) {
+	return dex === Dexterity.Left ? Dexterity.Right : Dexterity.Left
+}
+
 // Synchronous queue that may request a new element through a generator
 export class Pakulikha<A> {
 	q: A | null
@@ -242,6 +247,11 @@ export function* enumerate<A>(i: Iterable<A>): Generator<[number, A], void, any>
 		yield [index++, x]
 }
 
+export function* enumerateArray<A>(xs: A[], from: number): Generator<[number, A], void, any> {
+	for (let i = from; i < xs.length; i++)
+		yield [i, xs[i]]
+}
+
 export function mkArray<A>(length: number, x: A): A[] {
 	return Array(length).fill(x)
 }
@@ -256,9 +266,9 @@ export function it(xs: any): Generator<any, void, any> {
 	return "next" in xs ? xs : makeIt(xs)
 }
 
-export function findUniqueIndex<A>(xs: A[], f: (_: A) => boolean) {
+export function findUniqueIndex<A>(xs: A[], f: (_: A) => boolean, from = 0) {
 	let ri = -1
-	for (let [i, x] of xs.entries())
+	for (let [i, x] of enumerateArray(xs, from))
 		if (f(x)) {
 			ri = i
 			break
