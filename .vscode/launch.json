@@ -1,13 +1,19 @@
+// NOTE: You can also debug Node and Deno by running them in VSCode terminal when "autoattach" is enabled
+// Debug Bun using the extension
+
 {
 	// C-space for templates.
 	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Launch",
-			"type": "node",
-			"request": "attach",
+			"name": "Launch Deno",
 			"port": 9229,
+			"request": "attach",
+			"skipFiles": [
+				"<node_internals>/**"
+			],
+			"type": "node",
 
 			"preLaunchTask": "Deno Debug"
 		}

@@ -1,6 +1,6 @@
 import { assert } from './util.ts'
 
-export function spawn(f: TimerHandler) {
+export function spawn(f: () => void) {
 	setTimeout(f)
 }
 

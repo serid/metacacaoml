@@ -1,6 +1,6 @@
-import { assertEq, nonExhaustiveMatch, join, setContains, mapInsert, ObjectMap } from './util.ts'
+import { assertEq, nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap } from './util.ts'
 
-import { Syntax } from "./syntax.ts"
+import { Syntax } from './syntax.ts'
 import { CompileError, ItemCtx } from './compile.ts'
 import { RootTyck } from './huk.ts'
 

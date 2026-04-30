@@ -9,6 +9,7 @@
 				, "no-ex-assign"
 				, "require-yield"
 				, "ban-types"
+				, "no-process-global"
 				]
 		}
 	}

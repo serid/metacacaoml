@@ -1,12 +1,14 @@
-import { ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
+import { readFile } from 'node:fs/promises'
 
-import { Syntax } from "./syntax.ts"
-import { Huk, RootTyck } from "./huk.ts"
-import { ItemCodegen, RootCodegen } from "./codegen.ts"
+import { type ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
+
+import { Syntax } from './syntax.ts'
+import { Huk, RootTyck } from './huk.ts'
+import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
 import { toposort } from './algorithms.ts'
 
-const std = await globalThis.Deno.readTextFile("./std.meml.rs")
+const std = await readFile("./std.meml.rs", { encoding:"utf-8" })
 
 export class CompileError extends Error {
 	log: string

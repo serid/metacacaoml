@@ -1,6 +1,6 @@
 // Pull-style query system for compilers
 
-import { mapGet, ObjectMap } from "./util.ts"
+import { mapGet, type ObjectMap } from './util.ts'
 
 function argsToString(args: string[]) {
 	return args.join(":")

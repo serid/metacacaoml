@@ -1,9 +1,11 @@
+import { readFile } from 'node:fs/promises'
+
 import { Compiler } from './compile.ts'
 import { write } from './util.ts'
 
 async function test() {
 	let t = performance.now()
-	let src = await globalThis.Deno.readTextFile("./test.meml.rs")
+	let src = await readFile("./test.meml.rs", { encoding:"utf-8" })
 	let obj = new Compiler(src, true).compile()
 
 	// write(`Obj: ${obj}`)
@@ -14,12 +16,13 @@ async function test() {
 }
 
 async function main() {
-	if (globalThis.Deno.args.length === 0) {
+	process.argv.splice(0, 2) // drop executable path and script path
+	if (process.argv.length === 0) {
 		await test()
 		return
 	}
 
-	let src = await globalThis.Deno.readTextFile(globalThis.Deno.args[0])
+	let src = await readFile(process.argv[0], { encoding:"utf-8" })
 	eval?.(new Compiler(src, false).compile())
 }
 
