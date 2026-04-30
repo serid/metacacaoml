@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses } from './util.ts'
 
 import { Syntax } from './syntax.ts'
 import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
@@ -430,9 +430,8 @@ private subtypeUi(ty1: any, ty2: any) {
 		this.subtype(ty1, ty2)
 	} catch (e) {
 		assert(e.constructor !== CompileError)
-		e.message = `error: \`${showType(ty1)}' is not a subtype of \`${showType(ty2)}'`
 		throw new CompileError(this.ins().span, this.log.join("\n"),
-			undefined,
+			`error: \`${showType(ty1)}' is not a subtype of \`${showType(ty2)}'`,
 			{ cause: e })
 	}
 }
@@ -731,8 +730,12 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 				this.check(codomain)
 				error("expected error: "+expected)
 			} catch (e) {
-				while (e.cause !== undefined) e = e.cause
-				assertEq(e.message, expected)
+				// If none of error messages match expectation, report discrepancy
+				// and rethrow
+				if (every(exceptionCauses(e), e => e.message !== expected)) {
+					write(`Expected error "${expected}"`)
+					throw e
+				}
 
 				mapRemove(this.root.globals, symbol)
 				return false

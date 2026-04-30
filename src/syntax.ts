@@ -1,6 +1,6 @@
 import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
-import { error, assert, assertL, fuel, range, last, makeFraction, all, any, unSingleton, assertDefined, assertEq } from './util.ts'
+import { error, assert, assertL, fuel, range, last, makeFraction, every, any, unSingleton, assertDefined, assertEq } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
 	if (w.length > s.length - i) return false
@@ -470,7 +470,7 @@ private toplevel() {
 
 		// assert(infixOperatorAnlautRule.test(firstStr(symbols)),
 		// 	"an infix operator shall start with a symbol")
-		assert(all(symbols, c => infixOperatorInlautRule.test(c)),
+		assert(every(symbols, c => infixOperatorInlautRule.test(c)),
 			"an infix operator shall contain no whitespace")
 		// assert(infixOperatorAuslautRule.test(lastStr(symbols)),
 		// 	"an infix operator shall end with a symbol")

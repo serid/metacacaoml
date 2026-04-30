@@ -127,7 +127,7 @@ export function mapRemove<A>(o: ObjectMap<A>, key: string | number) {
 // create a projection of a map that has all same entries with
 // values filtered and transformed by f
 export function mapFilterMapProjection<A, B>(o: ObjectMap<A>, f: (name: string, code: A) => B | null): ObjectMap<B> {
-	return any(new Proxy(o, {
+	return <any>(new Proxy(o, {
 		get(target, key: string, _receiver) {
 			let value = Reflect.get(target, key)
 			if (value === undefined) return undefined
@@ -280,7 +280,13 @@ export function findUniqueIndex<A>(xs: A[], f: (_: A) => boolean, from = 0) {
 	return ri
 }
 
-export function all<A>(i: Iterable<A>, f: (_: A) => boolean) {
+export function indexOf<A>(i: Iterable<A>, x: A) {
+	for (let [ix, y] of enumerate(i))
+		if (y === x) return ix
+	return -1
+}
+
+export function every<A>(i: Iterable<A>, f: (_: A) => boolean) {
 	for (let x of i) if (!f(x)) return false
 	return true
 }
@@ -326,6 +332,16 @@ export function forEach<A>(i: Iterable<A>, f: (_: A) => void) {
 export function* bind(i: any, k: any) {
 	for (let x of i)
 		for (let y of k(x)) yield y
+}
+
+
+export function* exceptionCauses(e: Error): Generator<Error, void, void> {
+	yield e
+	let fixpoint = <Error>e.cause
+	while (fixpoint !== undefined) {
+		yield fixpoint
+		fixpoint = any(fixpoint).cause
+	}
 }
 
 // 12345 -> 0.12345

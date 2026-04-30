@@ -177,8 +177,10 @@ private reportError(e: CompileError) {
 	let lineStart = this.src.lastIndexOf("\n", e.span) + 1
 	let lineEnd = this.src.indexOf("\n", e.span)
 	if (lineEnd === -1) lineEnd = this.src.length
-	write(lineNumberString + this.src.substring(lineStart, lineEnd))
+	write("\n" + lineNumberString + this.src.substring(lineStart, lineEnd))
 	write(" ".repeat(lineNumberString.length + (e.span - lineStart)) + "^")
+	write("CompileError: " + e.message)
+	write("Caused by:\n")
 }
 
 compile() {
