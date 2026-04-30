@@ -208,23 +208,13 @@ export function unSingleton<A>(xs: A[]): A {
 	return xs[0]
 }
 
-export function first<A>(xs: A[]) {
+export function first<A>(xs: ArrayLike<A>) {
 	assert(xs.length > 0, "array is empty")
 	return xs[0]
 }
 
-export function firstStr(xs: string) {
-	assert(xs.length > 0, "string is empty")
-	return xs[0]
-}
-
-export function last<A>(xs: A[]) {
+export function last<A>(xs: ArrayLike<A>) {
 	assert(xs.length > 0, "array is empty")
-	return xs[xs.length-1]
-}
-
-export function lastStr(xs: string) {
-	assert(xs.length > 0, "string is empty")
 	return xs[xs.length-1]
 }
 
@@ -232,8 +222,14 @@ export function indices<A>(xs: A[]) {
 	return range(xs.length)
 }
 
+export function count<A>(xs: Iterable<A>, y: A): number {
+	let c = 0
+	for (let x of xs) if (x === y) c++
+	return c
+}
+
 export function* view<A>(
-	xs: A[], from: number, to = xs.length, step = 1): Iterable<A> {
+	xs: ArrayLike<A>, from: number, to = xs.length, step = 1): Iterable<A> {
 	for (let i of range(from, to, step)) yield xs[i]
 }
 

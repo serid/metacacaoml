@@ -169,6 +169,9 @@ log(...xs: any[]) {
 private reportError(e: CompileError) {
 	if (this.logging) write(e.log)
 
+	let tabsize = 2
+	let tab = ' '.repeat(tabsize)
+
 	let lineNumber = 0
 	for (let i of range(e.span)) if (this.src[i] === "\n") lineNumber++
 	let lineNumberString = lineNumber + " | "
@@ -177,10 +180,22 @@ private reportError(e: CompileError) {
 	let lineStart = this.src.lastIndexOf("\n", e.span) + 1
 	let lineEnd = this.src.indexOf("\n", e.span)
 	if (lineEnd === -1) lineEnd = this.src.length
-	write("\n" + lineNumberString + this.src.substring(lineStart, lineEnd))
-	write(" ".repeat(lineNumberString.length + (e.span - lineStart)) + "^")
-	write("CompileError: " + e.message)
-	write("Caused by:\n")
+
+	let unformattedLine = this.src.substring(lineStart, lineEnd)
+	let formattedLine = unformattedLine.replaceAll('\t', tab)
+	formattedLine = `\n${lineNumberString}${formattedLine}`
+
+	// Count characters in line prefix. Tabs count for `tabsize` characters
+	let charOffset = e.span - lineStart
+	let cellOffset = 0
+	for (let x of unformattedLine.substring(0, charOffset))
+		cellOffset += x === '\t' ? tabsize : 1
+	let underline = ' '.repeat(lineNumberString.length + cellOffset) + "^"
+
+	write(`${formattedLine}
+${underline}
+CompileError: ${e.message}
+Caused by:\n`)
 }
 
 compile() {
