@@ -320,10 +320,10 @@ private instantiateEvar(direction: Dexterity, alpha: string, other: any) {
 		// why is codomain first?
 		// should domain elements be reversed too?
 		let inventions = this.inventEVars("Y", other.domain.length + 1)
-		
+
 		let domain_names = [...inventions]
 		let codomain_name = domain_names.pop()
-		
+
 		let ctxSnippet: any[] = inventions.map(mkEVar)
 		ctxSnippet.reverse()
 		ctxSnippet.push({tag: "esolve", name: this.ctx[ix].name, solution: {
@@ -346,7 +346,7 @@ private instantiateEvar(direction: Dexterity, alpha: string, other: any) {
 	case "cons": {
 		// designed based on the arrow case
 		let arg_names = this.inventEVars("K", other.args.length)
-		
+
 		let ctxSnippet: any[] = arg_names.map(mkEVar)
 		ctxSnippet.reverse()
 		ctxSnippet.push({tag: "esolve", name: this.ctx[ix].name, solution: {
@@ -558,7 +558,7 @@ private infer_() {
 				})
 			}
 			this.check(par.codomain)
-			
+
 			// Remove from context the prepared marker and everything after it
 			// including vars and body tyck remnants
 			// Evars introduced for arrow remain

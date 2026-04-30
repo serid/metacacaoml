@@ -1,6 +1,6 @@
 {
 	"lint": {
-		"exclude": ["./delcont.js"],
+		"exclude": ["./doc/delcont.js"],
 		"rules": {
 			"tags": ["recommended"],
 			"exclude":

@@ -3,9 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { Compiler } from './compile.ts'
 import { write } from './util.ts'
 
-async function test() {
+function test(src: string) {
 	let t = performance.now()
-	let src = await readFile("./test.meml.rs", { encoding:"utf-8" })
 	let obj = new Compiler(src, true).compile()
 
 	// write(`Obj: ${obj}`)
@@ -16,14 +15,18 @@ async function test() {
 }
 
 async function main() {
-	process.argv.splice(0, 2) // drop executable path and script path
-	if (process.argv.length === 0) {
-		await test()
-		return
-	}
+	test(await readFile("./src/test.meml.rs", { encoding:"utf-8" }))
+	/* test(`
+fun .test-to-Array('A i:Iter(A)): Array(A) =
+	# todo: buff up type inference to allow \`as\` here
+	@[] as fun λ xs.
+	i.for-each { x.
+		xs.push(x)
+	};
+	xs
 
-	let src = await readFile(process.argv[0], { encoding:"utf-8" })
-	eval?.(new Compiler(src, false).compile())
+fun main(): Iota =
+Iota/Iota()`) */
 }
 
 await main()

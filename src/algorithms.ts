@@ -1,4 +1,4 @@
-import { mkArray, indices } from './util.ts';
+import { mkArray, indices } from './util.ts'
 
 export function* toposort<A>(
 	vertices: A[], edges: (_: A) => number[]): Iterable<A> {

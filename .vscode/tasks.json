@@ -4,7 +4,7 @@
 		{
 			"label": "Deno Debug",
 			"type": "shell",
-			"command": "deno run --inspect-wait --allow-all main.ts",
+			"command": "deno run --inspect-wait --allow-all test",
 			"isBackground": true,
 			"presentation": {
 				"clear": true,

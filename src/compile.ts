@@ -8,7 +8,7 @@ import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
 import { toposort } from './algorithms.ts'
 
-const std = await readFile("./std.meml.rs", { encoding:"utf-8" })
+const std = await readFile("./src/std.meml.rs", { encoding:"utf-8" })
 
 export class CompileError extends Error {
 	log: string
