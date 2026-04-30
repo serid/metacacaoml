@@ -302,18 +302,25 @@ private instantiateEvar(direction: Dexterity, alpha: string, other: any) {
 
 	let ix = findUniqueIndex(this.ctx,
 		x => x.tag === "evar" && x.name === alpha)
-	assert(ix !== -1) // invariant
+	assert(ix !== -1, `evar ?${alpha} not found`) // invariant
 
 	switch (other.tag) {
 	case "euse": {
+		// If other is also an evar use, then we're doing either
+		// InstLSolve or InstLReach (or the R versions).
+		// What these rules effectively do is find whichever evar is
+		// further in context and solve it to firster evar.
 		let ix2 = findUniqueIndex(this.ctx,
-			x => x.tag === "evar" && x.name === other.name, ix + 1)
-		assert(ix2 !== -1) // invariant
+			x => x.tag === "evar" && x.name === other.name)
+		assert(ix2 !== -1, `evar ?${other.name} not found`) // invariant
 
-		// curiously beta is always further in context so it's the one being
-		// resolved
-		this.ctx[ix2] = {tag: "esolve", name: this.ctx[ix2].name,
-			solution: mkEUse(alpha)}
+		if (ix < ix2)
+			// Inst(L|R)Reach
+			this.ctx[ix2] = {tag: "esolve", name: this.ctx[ix2].name,
+				solution: mkEUse(alpha)}
+		else
+			// Inst(L|R)Solve
+			this.ctx[ix] = {tag: "esolve", name: this.ctx[ix].name, solution: other}
 		break
 	}
 	case "arrow": {
