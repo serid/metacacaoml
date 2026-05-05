@@ -10,6 +10,7 @@
 				, "require-yield"
 				, "ban-types"
 				, "no-process-global"
+				, "no-namespace"
 				]
 		}
 	}

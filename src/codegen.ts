@@ -1,6 +1,6 @@
 import { assertEq, nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap } from './util.ts'
 
-import { Syntax } from './syntax.ts'
+import { Syntax, ToplevelTag } from './syntax.ts'
 import { CompileError, ItemCtx } from './compile.ts'
 import { RootTyck } from './huk.ts'
 
@@ -144,7 +144,7 @@ private codegen_(): ObjectMap<string> {
 	let toplevels: ObjectMap<string> = Object.create(null)
 
 	switch (item.tag) {
-	case Syntax.cls: {
+	case ToplevelTag.cls: {
 		let elimCode = []
 		let ps = join(item.conss.map(x=>x.name))
 		elimCode.push(`function*(self, ${ps}) {\n  switch (self.tag) {\n`)
@@ -168,14 +168,14 @@ private codegen_(): ObjectMap<string> {
 		mapInsert(toplevels, item.name+"ᐅelim", elimCode.join(""))
 		break
 	}
-	case Syntax.let: {
+	case ToplevelTag._let: {
 		this.code.push(`(function*() {\n`)
 		let retIx = this.expr()
 		this.code.push(`  return ${retIx}\n})().next().value`)
 		mapInsert(toplevels, item.name, this.unshiftCode())
 		break
 	}
-	case Syntax.fun: {
+	case ToplevelTag.fun: {
 		let bs = item.bs.map(x=>x.name)
 		this.code.push(`(function*(${join(bs)}) {\n`)
 		let retIx2 = this.expr()
@@ -184,11 +184,11 @@ private codegen_(): ObjectMap<string> {
 		mapInsert(toplevels, this.itemCtx.getToplevelSymbol(), this.unshiftCode())
 		break
 	}
-	case Syntax.nakedfun:
+	case ToplevelTag.typeexpr:
 		this.code.push(`  return ${this.expr()}`)
 		mapInsert(toplevels, "_", this.unshiftCode())
 		break
-	case Syntax.infixdecl:
+	case ToplevelTag.infixdecl:
 		break
 	default:
 		nonExhaustiveMatch(item.tag)

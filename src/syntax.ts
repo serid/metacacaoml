@@ -9,17 +9,9 @@ function isPrefix(s: string, i: number, w: string) {
 	return true
 }
 
-function unsignalNaN(x: number | symbol, message: string) {
-	assert(x !== Symbol.for("signaling-NaN"), message)
+function unsignalNaN(x: HyperReal, message: string) {
+	assert(x !== signalingNan, message)
 	return <number>x
-}
-
-type InfixDecl = {
-	symbols: string,
-	associativity: string,
-	strength: number | symbol,
-	isMethod: boolean,
-	replacement: string
 }
 
 let identAnlautRule = /[a-zA-Z\-]/
@@ -30,24 +22,58 @@ let identInlautRule = /[a-zA-Z0-9\-/]/
 let infixOperatorInlautRule = /\S/
 // let infixOperatorAuslautRule = infixOperatorAnlautRule
 
+export const signalingNan = Symbol("signaling-NaN")
+export type HyperReal = number | typeof signalingNan
+
+export type InfixDecl = {
+	symbols: string,
+	associativity: string,
+	strength: HyperReal,
+	isMethod: boolean,
+	replacement: string
+}
+
+export type Field = { name: string, type: TypeExpr }
+export type Constructor = { name: string, fields: Field[] }
+
+export type Annotation = { name: string, text: string }
+export type Binding = { name: string, type: TypeExpr }
+
+// A Toplevel is the syntactic part of an Item data structure
+export namespace ToplevelTag {
+	export const typeexpr = Symbol("type-expr")
+	export const cls = Symbol("cls")
+	export const _let = Symbol("let")
+	export const fun = Symbol("fun")
+	export const infixdecl = Symbol("infix-decl")
+}
+
+export type TypeExpr =
+	{ tag: typeof ToplevelTag.typeexpr, span: number, arena: any[] }
+export type Toplevel =
+	| TypeExpr
+	| { tag: typeof ToplevelTag.cls, span: number,
+		name: string, gs: string[], conss: Constructor[] }
+	| { tag: typeof ToplevelTag._let, span: number,
+		name: string, retT: TypeExpr, arena: any[] }
+	| { tag: typeof ToplevelTag.fun, span: number,
+		isMethod: boolean, name: string, gs: string[], bs: Binding[],
+		retT: TypeExpr, annots: Annotation[], arena: any[] }
+	| { tag: typeof ToplevelTag.infixdecl, span: number } & InfixDecl
+
 export class Syntax {
 static strlit = Symbol("strlit")
-static fun = Symbol("fun")
 static native = Symbol("native")
 static app = Symbol("app")
 static endapp = Symbol("endapp")
 static use = Symbol("use")
 static applam = Symbol("applam")
-static let = Symbol("let")
 static arrow = Symbol("arrow")
 static any = Symbol("any")
 static endarrow = Symbol("endarrow")
 static int = Symbol("int")
-static nakedfun = Symbol("naked-fun")
 static array = Symbol("array")
 static endarray = Symbol("endarray")
-static cls = Symbol("cls")
-static infixdecl = Symbol("infix-decl")
 
 private i: number = 0
 private infixDecls: InfixDecl[] = []
@@ -138,11 +164,11 @@ private uint() {
 }
 
 // parses a double-precision floating-point number
-private ieee754() {
+private ieee754(): HyperReal {
 	if (this.tryWord("NaN") || this.tryWord("qNaN"))
 		return NaN
 	if (this.tryWord("sNaN"))
-		return Symbol.for("signaling-NaN")
+		return signalingNan
 
 	let sign = this.tryWord("-") ? -1 : 1
 	if (this.tryWord("∞"))
@@ -187,8 +213,8 @@ private stringLiteral(end: string) {
 	return s
 }
 
-private type() {
-	return {tag: Syntax.nakedfun,
+private type(): TypeExpr {
+	return {tag: ToplevelTag.typeexpr,
 		span: this.i,
 		arena: this.expr()
 	}
@@ -209,7 +235,7 @@ private generics() {
 	return gs
 }
 
-private binding() {
+private binding(): Binding {
 	let name = this.ident()
 	if (name === null) return null
 	this.assertWord(":")
@@ -217,10 +243,9 @@ private binding() {
 	return { name, type }
 }
 
-private bindings() {
-	let bs = []
+private bindings(): Binding[] {
+	let bs: Binding[] = []
 	while (!this.tryWord(")")) {
-		fuel.step()
 		bs.push(this.binding())
 	}
 	return bs
@@ -401,8 +426,8 @@ private expr(): any[] {
 	return unSingleton(outputStack)
 }
 
-private toplevel() {
-	let annots = []
+private toplevel(): Toplevel {
+	let annots: Annotation[] = []
 	if (this.tryWord("@")) {
 		let name = this.assertIdent()
 		this.assertWord('(')
@@ -415,13 +440,13 @@ private toplevel() {
 		let name = this.assertIdent()
 		let gs = this.generics()
 
-		let conss = []
+		let conss: Constructor[] = []
 		while (!this.tryWord("end")) {
 			this.assertWord("|")
 			let name = this.assertIdent()
 			this.assertWord("(")
 
-			let fields = []
+			let fields: Field[] = []
 			let c = 0
 			while (!this.tryWord(")")) {
 				fields.push({
@@ -433,14 +458,14 @@ private toplevel() {
 			conss.push({name, fields})
 		}
 
-		return {tag: Syntax.cls, span, name, gs, conss}
+		return {tag: ToplevelTag.cls, span, name, gs, conss}
 	} else if (this.tryWord("let")) {
 		let name = this.assertIdent()
 		this.assertWord(":")
 		let retT = this.type()
 		this.assertWord("=")
 
-		return {tag: Syntax.let, span, name, retT, arena: this.expr()}
+		return {tag: ToplevelTag._let, span, name, retT, arena: this.expr()}
 	} else if (this.tryWord("fun")) {
 		let isMethod = this.tryWord(".")
 		let name = this.assertIdent()
@@ -452,13 +477,13 @@ private toplevel() {
 		this.assertWord("=")
 
 		let arena = this.expr()
-		return {tag: Syntax.fun, span, isMethod,name, gs, bs, retT, annots, arena}
+		return {tag: ToplevelTag.fun, span, isMethod, name, gs, bs, retT, annots, arena}
 	} else if (this.tryWord("infix")) {
 		let associativity = "none"
 		if (this.tryWord("left")) associativity = "left"
 		if (this.tryWord("right")) associativity = "right"
 		this.assertWord("at")
-		let strength = this.ieee754()
+		let strength: HyperReal = this.ieee754()
 
 		this.assertWord('"')
 		let symbols = this.stringLiteral('"')
@@ -476,10 +501,10 @@ private toplevel() {
 		// 	"an infix operator shall end with a symbol")
 
 		replacement = mangle(replacement)
-		let infix = {symbols, associativity, strength, isMethod, replacement}
+		let infix: InfixDecl = {symbols, associativity, strength, isMethod, replacement}
 		this.infixDecls.push(infix)
 
-		return {tag: Syntax.infixdecl, span, ...infix}
+		return {tag: ToplevelTag.infixdecl, span, ...infix}
 	}
 	else
 		error("expected toplevel")

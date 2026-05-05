@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 
 import { type ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
 
-import { Syntax } from './syntax.ts'
+import { Syntax, ToplevelTag } from './syntax.ts'
 import { Huk, RootTyck } from './huk.ts'
 import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
@@ -39,16 +39,16 @@ export class ItemCtx {
 	private getToplevelSymbols_(): string[] {
 		let item = this.item
 		switch (item.tag) {
-		case Syntax.cls: {
+		case ToplevelTag.cls: {
 			let symbol = item.name
 			let symbols = [symbol, symbol+"ᐅelim"]
 			for (let cons of item.conss)
 				symbols.push(symbol+"ᐅ"+cons.name)
 			return symbols
 		}
-		case Syntax.let:
+		case ToplevelTag._let:
 			return [item.name]
-		case Syntax.fun: {
+		case ToplevelTag.fun: {
 			if (!item.isMethod)
 				return [item.name]
 			assert(item.bs.length >= 1, "methods shall have at least one parameter")
@@ -68,10 +68,10 @@ export class ItemCtx {
 			}
 			return [className + "ᐅ" + item.name]
 		}
-		case Syntax.nakedfun:
-			error("naked fun has no toplevel symbols")
+		case ToplevelTag.typeexpr:
+			error("type expression cannot have toplevel symbols")
 			break // to please the linter
-		case Syntax.infixdecl:
+		case ToplevelTag.infixdecl:
 			return []
 		default:
 			nonExhaustiveMatch(item.tag)

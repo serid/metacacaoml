@@ -1,6 +1,6 @@
 import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses } from './util.ts'
 
-import { Syntax } from './syntax.ts'
+import { Syntax, ToplevelTag, type TypeExpr } from './syntax.ts'
 import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
 
 //! Implements typechecking using an algorithm from
@@ -130,9 +130,9 @@ getSymbolicDependencies() {
 }
 
 // normalization by jit compilation
-private normalize(tyExpr: {tag: symbol, span: number, arena: any[]}) {
+private normalize(tyExpr: TypeExpr) {
 	try {
-	assertEq(tyExpr.tag, Syntax.nakedfun)
+	assertEq(tyExpr.tag, ToplevelTag.typeexpr)
 
 	this.root.normalCounter++
 	// prepare environment (it will be passed in params)
@@ -636,7 +636,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 	try {
 	let item = this.item
 	switch (item.tag) {
-	case Syntax.cls: {
+	case ToplevelTag.cls: {
 		let symbol = first(this.itemCtx.getToplevelSymbols())
 		// add type constructor to globals
 		mapInsert(this.root.globals, symbol, {
@@ -692,7 +692,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 		})
 		break
 	}
-	case Syntax.let: {
+	case ToplevelTag._let: {
 		let symbol = this.itemCtx.getToplevelSymbol()
 		let ty = this.normalize(item.retT)
 		this.check(ty)
@@ -703,7 +703,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 		})
 		break
 	}
-	case Syntax.fun: {
+	case ToplevelTag.fun: {
 		assert(item.annots.length <= 1)
 
 		// normalize the function type
@@ -752,10 +752,10 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 	}
 
 	// When checking a type annotation
-	case Syntax.nakedfun:
+	case ToplevelTag.typeexpr:
 		this.check(useType)
 		break
-	case Syntax.infixdecl:
+	case ToplevelTag.infixdecl:
 		break
 	default:
 		nonExhaustiveMatch(item.tag)
