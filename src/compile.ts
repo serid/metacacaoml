@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 
 import { type ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
 
-import { Syntax, ToplevelTag } from './syntax.ts'
+import { Syntax, ToplevelTag, type Toplevel } from './syntax.ts'
 import { Huk, RootTyck } from './huk.ts'
 import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
@@ -30,7 +30,7 @@ export class ItemCtx {
 
 	constructor(private compiler: Compiler,
 		private rootTyck: RootTyck, cg: RootCodegen | null,
-		public network: Network, private item: any) {
+		public network: Network, private item: Toplevel) {
 		this.tyck = new Huk(this.compiler, this, rootTyck, item)
 		this.cg = new ItemCodegen(this, cg, rootTyck, item)
 	}
@@ -74,7 +74,7 @@ export class ItemCtx {
 		case ToplevelTag.infixdecl:
 			return []
 		default:
-			nonExhaustiveMatch(item.tag)
+			nonExhaustiveMatch(item satisfies never)
 		}
 
 	}

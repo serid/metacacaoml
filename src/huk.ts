@@ -1,6 +1,6 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any } from './util.ts'
 
-import { Syntax, ToplevelTag, type TypeExpr } from './syntax.ts'
+import { Syntax, ToplevelTag, type Toplevel, type TypeExpr } from './syntax.ts'
 import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
 
 //! Implements typechecking using an algorithm from
@@ -58,18 +58,22 @@ constructor(
 	private compiler: Compiler,
 	private itemCtx: ItemCtx,
 	private root: RootTyck, // toplevel tycker
-	private item: any) {}
+	private item: Toplevel) {}
+
+private arena(): any[] {
+	return any(this.item).arena
+}
 
 private ins() {
-	return this.item.arena[Math.max(this.k-1, 0)]
+	return this.arena()[Math.max(this.k-1, 0)]
 }
 
 private nextIns() {
-	return this.item.arena[this.k]
+	return this.arena()[this.k]
 }
 
 private stepIns() {
-	return this.item.arena[this.k++]
+	return this.arena()[this.k++]
 }
 
 // invent a name like hint but not present in "taken"
@@ -130,7 +134,7 @@ getSymbolicDependencies() {
 }
 
 // normalization by jit compilation
-private normalize(tyExpr: TypeExpr) {
+private normalize(tyExpr: TypeExpr): any {
 	try {
 	assertEq(tyExpr.tag, ToplevelTag.typeexpr)
 
@@ -589,7 +593,7 @@ private infer_() {
 
 private infer() {
 	try {
-		let pretty = showExpr(this.item.arena, this.k)
+		let pretty = showExpr(this.arena(), this.k)
 		this.enterTyping(`|- ${pretty} => ?`)
 		let ty = this.infer_()
 		this.exitTyping(`-| ${pretty} => ${showType(ty)}`)
@@ -657,7 +661,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 		for (let name of item.gs)
 			this.ctx.push({tag: "uni", name})
 
-		let normalConss = item.conss.map(c=>({
+		let normalConss: any = item.conss.map(c=>({
 			...c, fields:c.fields.map(f=>
 				this.normalize(f.type)
 			)
@@ -758,7 +762,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 	case ToplevelTag.infixdecl:
 		break
 	default:
-		nonExhaustiveMatch(item.tag)
+		nonExhaustiveMatch(item satisfies never)
 	}
 	return true
 	} catch (e) {

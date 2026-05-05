@@ -1,6 +1,6 @@
-import { assertEq, nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap } from './util.ts'
+import { assertEq, nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap, any } from './util.ts'
 
-import { Syntax, ToplevelTag } from './syntax.ts'
+import { Syntax, ToplevelTag, type Toplevel } from './syntax.ts'
 import { CompileError, ItemCtx } from './compile.ts'
 import { RootTyck } from './huk.ts'
 
@@ -22,18 +22,22 @@ constructor(
 	private itemCtx: ItemCtx,
 	private root: RootCodegen | null, // toplevel codegen
 	private rootTyck: RootTyck, // toplevel tyck
-	private item: any) {}
+	private item: Toplevel) {}
+
+private arena(): any[] {
+	return any(this.item).arena
+}
 
 private ins() {
-	return this.item.arena[Math.max(this.k-1, 0)]
+	return this.arena()[Math.max(this.k-1, 0)]
 }
 
 private nextIns() {
-	return this.item.arena[this.k]
+	return this.arena()[this.k]
 }
 
 private stepIns() {
-	return this.item.arena[this.k++]
+	return this.arena()[this.k++]
 }
 
 private alloc() {
@@ -191,7 +195,7 @@ private codegen_(): ObjectMap<string> {
 	case ToplevelTag.infixdecl:
 		break
 	default:
-		nonExhaustiveMatch(item.tag)
+		nonExhaustiveMatch(item satisfies never)
 	}
 	return toplevels
 	} catch (e) {
