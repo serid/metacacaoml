@@ -1,6 +1,6 @@
-import { assertEq, nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap, any } from './util.ts'
+import { nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap, any, assertEq } from './util.ts'
 
-import { Syntax, ToplevelTag, type Toplevel } from './syntax.ts'
+import { InstrTag, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
 import { CompileError, ItemCtx } from './compile.ts'
 import { RootTyck } from './huk.ts'
 
@@ -24,7 +24,7 @@ constructor(
 	private rootTyck: RootTyck, // toplevel tyck
 	private item: Toplevel) {}
 
-private arena(): any[] {
+private arena(): Instr[] {
 	return any(this.item).arena
 }
 
@@ -69,28 +69,28 @@ private expr(): string {
 	let insLocation = this.k
 	let ins = this.stepIns()
 	switch (ins.tag) {
-	case Syntax.strlit:
+	case InstrTag.strlit:
 		return `"${ins.data}"`
-	case Syntax.native:
+	case InstrTag.native:
 		return ins.code
-	case Syntax.int:
+	case InstrTag.int:
 		return `${ins.data}`
-	case Syntax.use: {
+	case InstrTag.use: {
 		let name = ins.name
 		return setContains(this.rootTyck.globals, name) ?
 			"_fixtures_."+name : name
 	}
-	case Syntax.array: {
+	case InstrTag.array: {
 		let ixs: string[] = []
-		while (this.nextIns().tag!==Syntax.endarray)
+		while (this.nextIns().tag!==InstrTag.endarray)
 			ixs.push(this.expr())
 		this.k++
 		return this.emitSsa(`[${join(ixs)}]`)
 	}
-	case Syntax.app: {
+	case InstrTag.app: {
 		let ixs: string[] = []
 		// generate strict arguments
-		while (![Syntax.endapp, Syntax.applam].includes(this.nextIns().tag))
+		while (![InstrTag.endapp, InstrTag.applam].includes(this.nextIns().tag))
 			ixs.push(this.expr())
 
 		// For methods, fetch full name produced by tyck, otherwise the fun is first expression
@@ -107,10 +107,10 @@ private expr(): string {
 		// generate trailing lambdas
 		while (true) {
 		let ins = this.stepIns()
-		if (ins.tag === Syntax.endapp) break
-		assertEq(ins.tag, Syntax.applam)
+		if (ins.tag === InstrTag.endapp) break
+		assertEq(ins.tag, InstrTag.applam)
 
-		this.code.push(`  function*(${join(ins.ps)}) {\n`)
+		this.code.push(`  function*(${join(any(ins).ps)}) {\n`)
 		let retIx = this.expr()
 		this.code.push(`  return ${retIx}\n  },\n`)
 		}
@@ -121,11 +121,11 @@ private expr(): string {
 
 	// types
 
-	case Syntax.any:
+	case InstrTag.any:
 		return `{tag:"any"}`
-	case Syntax.arrow: {
+	case InstrTag.arrow: {
 		let domain: string[] = []
-		while (this.nextIns().tag !== Syntax.endarrow)
+		while (this.nextIns().tag !== InstrTag.endarrow)
 			domain.push(this.expr())
 		this.k++
 		let codomain = this.expr()

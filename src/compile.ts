@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises'
 
-import { type ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
+import { any, type ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
 
-import { Syntax, ToplevelTag, type Toplevel } from './syntax.ts'
+import { InstrTag, Syntax, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
 import { Huk, RootTyck } from './huk.ts'
 import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
@@ -56,12 +56,13 @@ export class ItemCtx {
 			let annotation = item.bs[0].type.arena
 			let className: string
 			switch (annotation[0].tag) {
-				case Syntax.use:
+				case InstrTag.use:
 					className = annotation[0].name
 					break
-				case Syntax.app:
-					assert(annotation[1].tag===Syntax.use, "1st parameter of a method shall be a class")
-					className = annotation[1].name
+				case InstrTag.app:
+					assert(annotation[1].tag===InstrTag.use,
+						"1st parameter of a method shall be a class")
+					className = any(annotation[1]).name
 					break
 				default:
 					error("1st parameter of a method shall be a class")
@@ -235,38 +236,38 @@ compile() {
 }
 }
 
-function showExpr0(arena: any[], boxI: number[], builder: string[]) {
+function showExpr0(arena: Instr[], boxI: number[], builder: string[]) {
 	let ins = arena[boxI[0]]
 	boxI[0]++
 	switch (ins.tag) {
-	case Syntax.strlit:
+	case InstrTag.strlit:
 		builder.push(`"${ins.data}"`)
 		break
-	case Syntax.native:
+	case InstrTag.native:
 		builder.push(`native[|${ins.code}|]`)
 		break
-	case Syntax.int:
+	case InstrTag.int:
 		builder.push(toString(ins.data))
 		break
-	case Syntax.array:
+	case InstrTag.array:
 		builder.push("@[")
-		if (arena[boxI[0]].tag!==Syntax.endarray)
+		if (arena[boxI[0]].tag!==InstrTag.endarray)
 			showExpr0(arena, boxI, builder)
-		while (arena[boxI[0]].tag!==Syntax.endarray) {
+		while (arena[boxI[0]].tag!==InstrTag.endarray) {
 			builder.push(" ")
 			showExpr0(arena, boxI, builder)
 		}
 		boxI[0]++
 		builder.push("]")
 		break
-	case Syntax.any:
+	case InstrTag.any:
 		builder.push("@any")
 		break
-	case Syntax.arrow:
+	case InstrTag.arrow:
 		builder.push("[")
-		if (arena[boxI[0]].tag!==Syntax.endarrow)
+		if (arena[boxI[0]].tag!==InstrTag.endarrow)
 			showExpr0(arena, boxI, builder)
-		while (arena[boxI[0]].tag!==Syntax.endarrow) {
+		while (arena[boxI[0]].tag!==InstrTag.endarrow) {
 			builder.push(" ")
 			showExpr0(arena, boxI, builder)
 		}
@@ -274,23 +275,23 @@ function showExpr0(arena: any[], boxI: number[], builder: string[]) {
 		builder.push("]")
 		showExpr0(arena, boxI, builder)
 		break
-	case Syntax.use:
+	case InstrTag.use:
 		builder.push(ins.name)
 		break
-	case Syntax.app:
+	case InstrTag.app:
 		showExpr0(arena, boxI, builder)
 		if (ins.metName !== null)
 			builder.push(".", ins.metName)
 		builder.push("(")
-		if (![Syntax.endapp, Syntax.applam].includes(arena[boxI[0]].tag))
+		if (![InstrTag.endapp, InstrTag.applam].includes(arena[boxI[0]].tag))
 			showExpr0(arena, boxI, builder)
-		while (![Syntax.endapp, Syntax.applam].includes(arena[boxI[0]].tag)) {
+		while (![InstrTag.endapp, InstrTag.applam].includes(arena[boxI[0]].tag)) {
 			builder.push(" ")
 			showExpr0(arena, boxI, builder)
 		}
 		builder.push(")")
-		while (arena[boxI[0]].tag===Syntax.applam) {
-			builder.push(" { ", arena[boxI[0]].ps.join(" "), ". ")
+		while (arena[boxI[0]].tag===InstrTag.applam) {
+			builder.push(" { ", any(arena[boxI[0]]).ps.join(" "), ". ")
 			boxI[0]++
 			showExpr0(arena, boxI, builder)
 			builder.push(" }")
@@ -302,7 +303,7 @@ function showExpr0(arena: any[], boxI: number[], builder: string[]) {
 	}
 }
 
-export function showExpr(arena: any[], i: number) {
+export function showExpr(arena: Instr[], i: number) {
 	let builder = []
 	showExpr0(arena, [i], builder)
 	return builder.join("")

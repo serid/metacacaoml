@@ -49,32 +49,50 @@ export namespace ToplevelTag {
 }
 
 export type TypeExpr =
-	{ tag: typeof ToplevelTag.typeexpr, span: number, arena: any[] }
+	{ tag: typeof ToplevelTag.typeexpr, span: number, arena: Instr[] }
 export type Toplevel =
 	| TypeExpr
 	| { tag: typeof ToplevelTag.cls, span: number,
 		name: string, gs: string[], conss: Constructor[] }
 	| { tag: typeof ToplevelTag._let, span: number,
-		name: string, retT: TypeExpr, arena: any[] }
+		name: string, retT: TypeExpr, arena: Instr[] }
 	| { tag: typeof ToplevelTag.fun, span: number,
 		isMethod: boolean, name: string, gs: string[], bs: Binding[],
-		retT: TypeExpr, annots: Annotation[], arena: any[] }
+		retT: TypeExpr, annots: Annotation[], arena: Instr[] }
 	| { tag: typeof ToplevelTag.infixdecl, span: number } & InfixDecl
 
-export class Syntax {
-static strlit = Symbol("strlit")
-static native = Symbol("native")
-static app = Symbol("app")
-static endapp = Symbol("endapp")
-static use = Symbol("use")
-static applam = Symbol("applam")
-static arrow = Symbol("arrow")
-static any = Symbol("any")
-static endarrow = Symbol("endarrow")
-static int = Symbol("int")
-static array = Symbol("array")
-static endarray = Symbol("endarray")
+export namespace InstrTag {
+	export const int = Symbol("int")
+	export const strlit = Symbol("strlit")
+	export const native = Symbol("native")
+	export const use = Symbol("use")
+	export const app = Symbol("app")
+	export const endapp = Symbol("endapp")
+	export const applam = Symbol("applam")
+	export const array = Symbol("array")
+	export const endarray = Symbol("endarray")
 
+	export const any = Symbol("any")
+	export const arrow = Symbol("arrow")
+	export const endarrow = Symbol("endarrow")
+}
+
+export type Instr =
+	| { tag: typeof InstrTag.int, span: number, data: number }
+	| { tag: typeof InstrTag.strlit, span: number, data: string }
+	| { tag: typeof InstrTag.native, span: number, code: string }
+	| { tag: typeof InstrTag.use, span: number, name: string }
+	| { tag: typeof InstrTag.app, span: number, metName: string | null }
+	| { tag: typeof InstrTag.endapp, span: number }
+	| { tag: typeof InstrTag.applam, span: number, ps: string[] }
+	| { tag: typeof InstrTag.array, span: number }
+	| { tag: typeof InstrTag.endarray, span: number }
+
+	| { tag: typeof InstrTag.any, span: number }
+	| { tag: typeof InstrTag.arrow, span: number }
+	| { tag: typeof InstrTag.endarrow, span: number }
+
+export class Syntax {
 private i: number = 0
 private infixDecls: InfixDecl[] = []
 
@@ -251,14 +269,13 @@ private bindings(): Binding[] {
 	return bs
 }
 
-// returns an array of instructions
-private exprNoInfix(): any[] {
+private exprNoInfix(): Instr[] {
 	let span = this.i
-	let insQueue = []
+	let insQueue: Instr[] = []
 	if (this.tryWord('"')) {
-		insQueue.push({tag: Syntax.strlit, span, data: this.stringLiteral('"')})
+		insQueue.push({tag: InstrTag.strlit, span, data: this.stringLiteral('"')})
 	} else if (this.tryWord("native[|")) {
-		insQueue.push({tag: Syntax.native, span, code: this.stringLiteral("|]")})
+		insQueue.push({tag: InstrTag.native, span, code: this.stringLiteral("|]")})
 	// } else if ("λ{".includes(this.peekChar())) {
 	// 	let isEmbraced = this.char() === "{"
 	// 	this.tryWhitespace()
@@ -267,18 +284,18 @@ private exprNoInfix(): any[] {
 	// 	if (isEmbraced) this.assertWord("}")
 	// 	return insQueue
 	} else if (/[0-9]/.test(this.peekChar())) {
-		insQueue.push({tag: Syntax.int, span, data: this.uint()})
+		insQueue.push({tag: InstrTag.int, span, data: this.uint()})
 	} else if (this.tryWord("@[")) {
-		insQueue.push({tag:Syntax.array, span})
+		insQueue.push({tag: InstrTag.array, span})
 		span = this.i
 		while (!this.tryWord("]")) {
 			insQueue.push(...this.expr())
 			span = this.i
 		}
-		insQueue.push({tag:Syntax.endarray, span})
+		insQueue.push({tag: InstrTag.endarray, span})
 	} else if (this.tryWord("(")) {
 		span = this.i
-		let subexprs = []
+		let subexprs: Instr[][] = []
 		while (!this.tryWord(")")) {
 			subexprs.push(this.expr())
 			span = this.i
@@ -287,31 +304,30 @@ private exprNoInfix(): any[] {
 		// Elaborate (1) to 1
 		// Elaborate (1 2 3) to Pair(1 Pair(2 3))
 		for (let i of range(subexprs.length-1)) {
-			insQueue.push({tag:Syntax.app, span, metName:null})
-			insQueue.push({tag:Syntax.use, span,
+			insQueue.push({tag: InstrTag.app, span, metName:null})
+			insQueue.push({tag: InstrTag.use, span,
 				name:"PairᐅNew"})
 			insQueue.push(...subexprs[i])
 		}
 		insQueue.push(...last(subexprs))
 		for (let _ of range(subexprs.length-1))
-			insQueue.push({tag:Syntax.endapp,
-				span})
+			insQueue.push({tag: InstrTag.endapp, span})
 	} else if (this.tryWord("@any")) {
-		return [{tag:Syntax.any, span}]
+		return [{tag: InstrTag.any, span}]
 	} else if (this.tryWord("[")) {
-		insQueue.push({tag:Syntax.arrow, span})
+		insQueue.push({tag: InstrTag.arrow, span})
 		span = this.i
 		while (!this.tryWord("]")) {
 			insQueue.push(...this.expr())
 			span = this.i
 		}
-		insQueue.push({tag:Syntax.endarrow, span})
+		insQueue.push({tag: InstrTag.endarrow, span})
 		insQueue.push(...this.expr())
 		return insQueue
 	} else {
 		let name = this.ident()
 		assert(name !== null, "expected expression")
-		insQueue.push({tag: Syntax.use, span, name})
+		insQueue.push({tag: InstrTag.use, span, name})
 	}
 
 	while (true) {
@@ -325,7 +341,7 @@ private exprNoInfix(): any[] {
 	// try parsing a function application
 	// lambdas don't need round parentheses ()
 	if (this.notPastEof() && "(λ{".includes(this.peekChar())) {
-		insQueue.unshift({tag: Syntax.app, span, metName})
+		insQueue.unshift({tag: InstrTag.app, span, metName})
 		metName = null
 		span = this.i
 		if (this.tryWord("("))
@@ -338,12 +354,12 @@ private exprNoInfix(): any[] {
 			let isEmbraced = this.char() === "{"
 			this.tryWhitespace()
 			let ps = this.idents(".")
-			insQueue.push({tag: Syntax.applam, span: span2, ps})
+			insQueue.push({tag: InstrTag.applam, span: span2, ps})
 			insQueue.push(...this.expr())
 			if (isEmbraced) this.assertWord("}")
 			span = this.i
 		}
-		insQueue.push({tag: Syntax.endapp, span})
+		insQueue.push({tag: InstrTag.endapp, span})
 		continue
 	}
 
@@ -353,7 +369,7 @@ private exprNoInfix(): any[] {
 	return insQueue
 }
 
-private static shuntingYardSpill(outputStack: any[][],
+private static shuntingYardSpill(outputStack: Instr[][],
 	operatorStack: {span:number, decl:InfixDecl}[]) {
 	let op = assertDefined(operatorStack.pop())
 	let right = assertDefined(outputStack.pop())
@@ -363,27 +379,27 @@ private static shuntingYardSpill(outputStack: any[][],
 	let inss = left
 	if (op.decl.isMethod) {
 		// blit "app+metName", [left], [right] and "endapp"
-		inss.unshift({tag:Syntax.app, span:op.span, metName:op.decl.replacement})
+		inss.unshift({tag: InstrTag.app, span:op.span, metName:op.decl.replacement})
 	} else {
 		// blit "app", "use", [left], [right] and "endapp"
-		inss.unshift({tag:Syntax.app, span:op.span, metName:null},
-			{tag:Syntax.use, span:op.span, name:op.decl.replacement})
+		inss.unshift({tag: InstrTag.app, span:op.span, metName:null},
+			{tag: InstrTag.use, span:op.span, name:op.decl.replacement})
 	}
-	//left stays between app and right
+	// left stays between app and right
 	inss.push(...right)
-	inss.push({tag:Syntax.endapp, span:last(right).span})
+	inss.push({tag: InstrTag.endapp, span:last(right).span})
 
 	outputStack.push(inss)
 }
 
 // returns an array of instructions
-private expr(): any[] {
+private expr(): Instr[] {
 	let first = this.exprNoInfix()
 
 	// Try binary operators
 	// Employ the shunting yard algorithm where output stack items are
 	// fully baked instruction sequences
-	let outputStack: any[][] = [first]
+	let outputStack: Instr[][] = [first]
 	let operatorStack: {span:number, decl:InfixDecl}[] = []
 	while (true) {
 		let span = this.i

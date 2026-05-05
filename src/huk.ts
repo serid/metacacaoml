@@ -1,6 +1,6 @@
 import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any } from './util.ts'
 
-import { Syntax, ToplevelTag, type Toplevel, type TypeExpr } from './syntax.ts'
+import { InstrTag, ToplevelTag, type Instr, type Toplevel, type TypeExpr } from './syntax.ts'
 import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
 
 //! Implements typechecking using an algorithm from
@@ -60,7 +60,7 @@ constructor(
 	private root: RootTyck, // toplevel tycker
 	private item: Toplevel) {}
 
-private arena(): any[] {
+private arena(): Instr[] {
 	return any(this.item).arena
 }
 
@@ -470,13 +470,13 @@ private infer_() {
 	let insLocation = this.k
 	let ins = this.stepIns()
 	switch (ins.tag) {
-	case Syntax.strlit:
+	case InstrTag.strlit:
 		return {tag:"cons", fullName:"String", args:[]}
-	case Syntax.native:
+	case InstrTag.native:
 		return {tag: "any"}
-	case Syntax.int:
+	case InstrTag.int:
 		return {tag:"cons", fullName:"Int", args:[]}
-	case Syntax.use: {
+	case InstrTag.use: {
 		// try finding a uni
 		if (this.ctx.findLastIndex(x=>
 			x.tag === "uni" && x.name === ins.name) !== -1)
@@ -489,19 +489,19 @@ private infer_() {
 
 		return this.ensureGlobalTyckedAndInstantiate(ins.name, "var not found")
 	}
-	case Syntax.array: {
+	case InstrTag.array: {
 		// if array is empty, element type is a fresh evar, otherwise infer
-		let elementTy = this.nextIns().tag===Syntax.endarray ?
+		let elementTy = this.nextIns().tag===InstrTag.endarray ?
 			mkEUse(this.allocEVar("Arr")) :
 			this.infer()
 
-		while (this.nextIns().tag!==Syntax.endarray)
+		while (this.nextIns().tag!==InstrTag.endarray)
 			this.check(elementTy)
 		this.k++
 
 		return {tag:"cons", fullName:"Array", args:[elementTy]}
 	}
-	case Syntax.app: {
+	case InstrTag.app: {
 		let isMethod = ins.metName !== null
 		let fty
 		if (!isMethod)
@@ -525,10 +525,10 @@ private infer_() {
 			// substitute each parameter since since context grows in information as we check arguments
 			par = this.substitute(par)
 			let ins = this.nextIns()
-			assertL(ins.tag !== Syntax.endapp, () => "expected argument of type " +
+			assertL(ins.tag !== InstrTag.endapp, () => "expected argument of type " +
 				showType(par))
 			// simple application
-			if (ins.tag !== Syntax.applam) {
+			if (ins.tag !== InstrTag.applam) {
 				this.check(par)
 				continue
 			}
@@ -579,12 +579,12 @@ private infer_() {
 			this.ctx.splice(ix, this.ctx.length - ix)
 		}
 
-		assertEq(this.stepIns().tag, Syntax.endapp) // invariant
+		assertEq(this.stepIns().tag, InstrTag.endapp) // invariant
 		return this.substitute(fty.codomain)
 	}
 	// Types
-	case Syntax.any:
-	case Syntax.arrow:
+	case InstrTag.any:
+	case InstrTag.arrow:
 		return useType
 	default:
 		nonExhaustiveMatch(ins.tag)
@@ -608,16 +608,16 @@ private check(ty: any) {
 	try {
 	let ins = this.stepIns()
 	switch (ins.tag) {
-	case Syntax.native:
+	case InstrTag.native:
 		return
-	case Syntax.strlit:
-	case Syntax.int:
-	case Syntax.array:
-	case Syntax.use:
-	case Syntax.app:
+	case InstrTag.strlit:
+	case InstrTag.int:
+	case InstrTag.array:
+	case InstrTag.use:
+	case InstrTag.app:
 	// Types
-	case Syntax.any:
-	case Syntax.arrow: {
+	case InstrTag.any:
+	case InstrTag.arrow: {
 		this.k--
 		let ty2 = this.infer()
 		this.subtypeUi(this.substitute(ty2),
