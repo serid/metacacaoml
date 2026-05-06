@@ -77,8 +77,12 @@ export function dbg(o: any) {
 	return o
 }
 
-export function nonExhaustiveMatch(o: any) {
-	error("unhandled branch: " + prettyPrint(o))
+export function unexpectedMatch(o: any): never {
+	error("unexpected variant: " + prettyPrint(o))
+}
+
+export function nonExhaustiveMatch(o: any): never {
+	error("unhandled variant: " + prettyPrint(o))
 }
 
 

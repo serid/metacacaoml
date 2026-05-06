@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 
-import { any, type ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
+import { any, type ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unexpectedMatch, unSingleton, write } from './util.ts'
 
 import { InstrTag, Syntax, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
 import { Huk, RootTyck } from './huk.ts'
@@ -298,8 +298,13 @@ function showExpr0(arena: Instr[], boxI: number[], builder: string[]) {
 		}
 		boxI[0]++
 		break
+	case InstrTag.endapp:
+	case InstrTag.applam:
+	case InstrTag.endarrow:
+	case InstrTag.endarray:
+		unexpectedMatch(ins); break
 	default:
-		nonExhaustiveMatch(ins.tag)
+		nonExhaustiveMatch(ins satisfies never)
 	}
 }
 

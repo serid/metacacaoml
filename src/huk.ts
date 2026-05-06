@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any, unexpectedMatch } from './util.ts'
 
 import { InstrTag, ToplevelTag, type Instr, type Toplevel, type TypeExpr } from './syntax.ts'
 import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
@@ -602,8 +602,13 @@ private infer_(): Type {
 	case InstrTag.any:
 	case InstrTag.arrow:
 		return useType
+	case InstrTag.endapp:
+	case InstrTag.applam:
+	case InstrTag.endarrow:
+	case InstrTag.endarray:
+		unexpectedMatch(ins); break
 	default:
-		nonExhaustiveMatch(ins.tag)
+		nonExhaustiveMatch(ins satisfies never)
 	}
 }
 
@@ -640,8 +645,14 @@ private check(ty: Type) {
 			this.substitute(ty))
 		return
 	}
+	case InstrTag.endapp:
+	case InstrTag.applam:
+	case InstrTag.endarrow:
+	case InstrTag.endarray:
+		unexpectedMatch(ins)
+		break
 	default:
-		nonExhaustiveMatch(ins.tag)
+		nonExhaustiveMatch(ins satisfies never)
 	}
 	} catch (e) {
 		if (e.constructor === CompileError) throw e

@@ -1,4 +1,4 @@
-import { nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap, any, assertEq } from './util.ts'
+import { nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap, any, assertEq, unexpectedMatch } from './util.ts'
 
 import { InstrTag, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
 import { CompileError, ItemCtx } from './compile.ts'
@@ -131,8 +131,13 @@ private expr(): string {
 		let codomain = this.expr()
 		return `{tag:"arrow", domain:[${join(domain)}], codomain:${codomain}}`
 	}
+	case InstrTag.endapp:
+	case InstrTag.applam:
+	case InstrTag.endarrow:
+	case InstrTag.endarray:
+		unexpectedMatch(ins);	break
 	default:
-		nonExhaustiveMatch(ins.tag)
+		nonExhaustiveMatch(ins satisfies never)
 	}
 	} catch (e) {
 		if (e.constructor === CompileError) throw e
