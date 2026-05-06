@@ -7,7 +7,21 @@ import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
 //! https://arxiv.org/abs/1306.6032
 //! simplified to omit higher-rank polymorphism
 
-function showType(ty: any) {
+type Type =
+	| { tag: "any" }
+	| { tag: "use", name: string }
+	| { tag: "euse", name: string }
+	| { tag: "cons", fullName: string, args: Type[] }
+	| { tag: "arrow", domain: Type[], codomain: Type }
+
+type CtxItem =
+	| { tag: "uni", name: string }
+	| { tag: "var", name: string, ty: Type }
+	| { tag: "evar", name: string }
+	| { tag: "esolve", name: string, solution: Type }
+	| { tag: "mark", id: number }
+
+function showType(ty: Type): string {
 	if (ty===undefined||ty===null) return String(ty)
 	switch (ty.tag) {
 	case "any":
@@ -25,24 +39,24 @@ function showType(ty: any) {
 	}
 }
 
-const useType = {tag: "cons", fullName: "Type", args: []}
+const useType: Type = {tag: "cons", fullName: "Type", args: []}
 
-function mkUse(name: string) {
+function mkUse(name: string): Type {
 	return {tag:"use",name}
 }
 
-function mkEUse(name: string) {
+function mkEUse(name: string): Type {
 	return {tag:"euse",name}
 }
 
-function mkEVar(name: string) {
+function mkEVar(name: string): CtxItem {
 	return {tag:"evar",name}
 }
 
 // The item typechecker, named after Yenisei
 export class Huk {
 private k: number = 0
-private ctx: any[] = []
+private ctx: CtxItem[] = []
 
 // log of typing judgements applied
 private depth: number = 0
@@ -179,7 +193,7 @@ private normalize(tyExpr: TypeExpr): any {
 private getTakenEVarNames(): string[] {
 	return [...map(filter(this.ctx, x=>
 		x.tag === "evar" || x.tag === "esolve"),
-		x=>x.name)]
+		x=>any(x).name)]
 }
 
 private inventEVars(hint: string, how_many: number): string[] {
@@ -211,7 +225,7 @@ private allocEVar(hint: string) {
 }
 
 // Replace universal variables with existentials
-private instantiate(vars: string[], ty: any) {
+private instantiate(vars: string[], ty: Type) {
 	this.enterTyping(`|- inst(${prettyPrint(vars)}, ${showType(ty)})`)
 
 	// generate fresh evar names
@@ -226,7 +240,7 @@ private instantiate(vars: string[], ty: any) {
 	return ty1
 }
 
-private static instantiate0(varMap: ObjectMap<string>, ty: any) {
+private static instantiate0(varMap: ObjectMap<string>, ty: Type): Type {
 	switch (ty.tag) {
 	case "cons":
 		return {tag: "cons",
@@ -247,12 +261,12 @@ private static instantiate0(varMap: ObjectMap<string>, ty: any) {
 	case "euse":
 		return ty
 	default:
-		nonExhaustiveMatch(ty.tag)
+		nonExhaustiveMatch(ty satisfies never)
 	}
 }
 
 // bidir.pdf: [Г]A
-private substitute(ty: any) {
+private substitute(ty: Type): Type {
 	//this.addTyping(`[${this.showCtx()}]${showType(ty)}`)
 	switch (ty.tag) {
 	case "any":
@@ -262,7 +276,7 @@ private substitute(ty: any) {
 		let ix = findUniqueIndex(this.ctx, x=>
 			x.tag === "esolve" && x.name === ty.name)
 		if (ix !== -1)
-			return this.substitute(this.ctx[ix].solution)
+			return this.substitute(any(this.ctx[ix]).solution)
 
 		// evar not solved, but is it even declared?
 		ix = findUniqueIndex(this.ctx, x => x.tag === "evar" && x.name === ty.name)
@@ -280,7 +294,7 @@ private substitute(ty: any) {
 			codomain: this.substitute(ty.codomain)
 		}
 	default:
-		nonExhaustiveMatch(ty.tag)
+		nonExhaustiveMatch(ty satisfies never)
 	}
 }
 
@@ -293,7 +307,7 @@ private substitute(ty: any) {
 // I still don't know what structure this order obeys and how Jana and Neel
 // arrived at it, but it seems that making an arrow of evars allocates the evars
 // in reverse order in context, see InstLArr
-private instantiateEvar(direction: Dexterity, alpha: string, other: any) {
+private instantiateEvar(direction: Dexterity, alpha: string, other: Type) {
 	switch (direction) {
 	case Dexterity.Left:
 		this.addTyping(`|- ?${alpha} <:= ${showType(other)}`); break
@@ -320,11 +334,11 @@ private instantiateEvar(direction: Dexterity, alpha: string, other: any) {
 
 		if (ix < ix2)
 			// Inst(L|R)Reach
-			this.ctx[ix2] = {tag: "esolve", name: this.ctx[ix2].name,
+			this.ctx[ix2] = {tag: "esolve", name: any(this.ctx[ix2]).name,
 				solution: mkEUse(alpha)}
 		else
 			// Inst(L|R)Solve
-			this.ctx[ix] = {tag: "esolve", name: this.ctx[ix].name, solution: other}
+			this.ctx[ix] = {tag: "esolve", name: alpha, solution: other}
 		break
 	}
 	case "arrow": {
@@ -335,9 +349,9 @@ private instantiateEvar(direction: Dexterity, alpha: string, other: any) {
 		let domain_names = [...inventions]
 		let codomain_name = domain_names.pop()
 
-		let ctxSnippet: any[] = inventions.map(mkEVar)
+		let ctxSnippet = inventions.map(mkEVar)
 		ctxSnippet.reverse()
-		ctxSnippet.push({tag: "esolve", name: this.ctx[ix].name, solution: {
+		ctxSnippet.push({tag: "esolve", name: alpha, solution: {
 			tag: "arrow",
 			domain: domain_names.map(mkEUse),
 			codomain: mkEUse(codomain_name)
@@ -358,9 +372,9 @@ private instantiateEvar(direction: Dexterity, alpha: string, other: any) {
 		// designed based on the arrow case
 		let arg_names = this.inventEVars("K", other.args.length)
 
-		let ctxSnippet: any[] = arg_names.map(mkEVar)
+		let ctxSnippet = arg_names.map(mkEVar)
 		ctxSnippet.reverse()
-		ctxSnippet.push({tag: "esolve", name: this.ctx[ix].name, solution: {
+		ctxSnippet.push({tag: "esolve", name: alpha, solution: {
 			tag: "cons",
 			fullName: other.fullName,
 			args: arg_names.map(mkEUse)
@@ -375,11 +389,11 @@ private instantiateEvar(direction: Dexterity, alpha: string, other: any) {
 		break
 	}
 	default:
-		this.ctx[ix] = {tag: "esolve", name: this.ctx[ix].name, solution: other}
+		this.ctx[ix] = {tag: "esolve", name: alpha, solution: other}
 	}
 }
 
-private subtype_(ty1: any, ty2: any) {
+private subtype_(ty1: Type, ty2: Type) {
 	if (ty1.tag === "euse" &&
 		ty2.tag === "euse" &&
 		ty1.name === ty2.name)
@@ -402,7 +416,7 @@ private subtype_(ty1: any, ty2: any) {
 		assert(ty2.tag === "use" && ty1.name === ty2.name)
 		break
 	case "cons":
-		assertEq(ty2.tag, "cons")
+		if (ty2.tag !== "cons") error()
 		assertEq(ty1.fullName, ty2.fullName)
 		for (let [x, y] of zip(ty1.args, ty2.args)) {
 			// new information may have been generated by previous steps
@@ -412,7 +426,7 @@ private subtype_(ty1: any, ty2: any) {
 		}
 		break
 	case "arrow": {
-		assert(ty2.tag === "arrow")
+		if (ty2.tag !== "arrow") error()
 		assert(ty1.domain.length === ty2.domain.length)
 		for (let [x, y] of zip(ty1.domain, ty2.domain)) {
 			// new information may have been generated by previous steps
@@ -426,17 +440,17 @@ private subtype_(ty1: any, ty2: any) {
 		break
 	}
 	default:
-		nonExhaustiveMatch(ty1.tag)
+		nonExhaustiveMatch(ty1 satisfies never)
 	}
 }
 
-private subtype(ty1: any, ty2: any) {
+private subtype(ty1: Type, ty2: Type) {
 	this.enterTyping(`|- ${showType(ty1)} <: ${showType(ty2)}`)
 	this.subtype_(ty1, ty2)
 	this.exitTyping(`-| ${showType(ty1)} <: ${showType(ty2)}`)
 }
 
-private subtypeUi(ty1: any, ty2: any) {
+private subtypeUi(ty1: Type, ty2: Type) {
 	try {
 		this.subtype(ty1, ty2)
 	} catch (e) {
@@ -447,7 +461,7 @@ private subtypeUi(ty1: any, ty2: any) {
 	}
 }
 
-private ensureGlobalTyckedAndInstantiate(symbol: string, msg: string): any {
+private ensureGlobalTyckedAndInstantiate(symbol: string, msg: string): Type {
 	this.symbolicDependencies.push(symbol)
 
 	let gb = this.root.globals[symbol]
@@ -466,7 +480,7 @@ private ensureGlobalTyckedAndInstantiate(symbol: string, msg: string): any {
 	return this.instantiate(gb.gs, gb.ty)
 }
 
-private infer_() {
+private infer_(): Type {
 	let insLocation = this.k
 	let ins = this.stepIns()
 	switch (ins.tag) {
@@ -485,7 +499,7 @@ private infer_() {
 		let ix = this.ctx.findLastIndex(x=>
 			x.tag === "var" && x.name === ins.name)
 		if (ix !== -1)
-			return this.ctx[ix].ty
+			return any(this.ctx[ix]).ty
 
 		return this.ensureGlobalTyckedAndInstantiate(ins.name, "var not found")
 	}
@@ -503,25 +517,27 @@ private infer_() {
 	}
 	case InstrTag.app: {
 		let isMethod = ins.metName !== null
-		let fty
+		let fty: Type
 		if (!isMethod)
 			fty = this.infer()
 		else {
 			let receiver = this.infer()
 			assertEq(receiver.tag, "cons")
 
-			let methodSymbol = receiver.fullName+"ᐅ"+ins.metName
+			let methodSymbol = any(receiver).fullName+"ᐅ"+ins.metName
 			mapInsert(this.methodSymbolAt, insLocation, methodSymbol)
 
 			fty = this.ensureGlobalTyckedAndInstantiate(
 				methodSymbol, "method not found")
+			if (fty.tag !== "arrow") error()
 			assert(fty.domain.length > 0)
 			this.subtypeUi(receiver, fty.domain[0])
 		}
 
-		assertEq(fty.tag, "arrow") //todo evar
+		//todo evar
+		if (fty.tag !== "arrow") error()
 
-		for (let par of view(<any[]>fty.domain, isMethod?1:0)) {
+		for (let par of view(fty.domain, isMethod?1:0)) {
 			// substitute each parameter since since context grows in information as we check arguments
 			par = this.substitute(par)
 			let ins = this.nextIns()
@@ -537,10 +553,10 @@ private infer_() {
 			let ps = ins.ps
 			this.k++
 			if (par.tag !== "euse") {
-				assertEq(par.tag, "arrow")
+				if (par.tag !== "arrow") error()
 				assertEq(par.domain.length, ps.length)
 			} else {
-				let newPar = {
+				let newPar: Type = {
 					tag:"arrow",
 					domain:ps.map(_=>mkEUse(this.allocEVar("H"))),
 					codomain:mkEUse(this.allocEVar("CH"))
@@ -604,7 +620,7 @@ private infer() {
 	}
 }
 
-private check(ty: any) {
+private check(ty: Type) {
 	try {
 	let ins = this.stepIns()
 	switch (ins.tag) {
@@ -667,7 +683,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 			)
 		}))
 
-		let self = {tag: "cons",
+		let self: Type = {tag: "cons",
 			fullName:symbol,
 			args:item.gs.map(mkUse)
 		}
@@ -780,7 +796,7 @@ tyck(): boolean {
 export class RootTyck {
 	// A fixture is a value or a function present at compilation time. C++ calls this constexpr and in Zig it's comptime
 	// types and fixture values of global declarations
-	globals: ObjectMap<{gs: string[], ty: any, value: LateInit<any>}> =
+	globals: ObjectMap<{gs: string[], ty: Type, value: LateInit<any>}> =
 		Object.create(null)
 	fixtures: ObjectMap<any> = mapFilterMapProjection(this.globals,
 		(_symbol, entry) => {
