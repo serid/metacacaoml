@@ -30,8 +30,8 @@ function *foo() {
 	//because yield* obscures errors as
 	//"(immediate value)(immediate value) is not iterable"
 
-	//can also be generalized to ingest values as in
-	//https://chatgpt.com/share/67b646fb-c198-800e-939b-fa4f67853128
+	//can also be generalized to ingest values, but please
+	//don't use js generation continuation values, they're quirky
 	let g = bar()
 	let res
 	while (true) {

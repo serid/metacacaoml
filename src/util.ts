@@ -178,7 +178,7 @@ export class Pakulikha<A> {
 	}
 	*recv() {
 		if (this.q === null) yield
-		let ret = <A>this.q
+		let ret = this.q
 		this.q = null
 		return ret
 	}

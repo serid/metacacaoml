@@ -1,6 +1,6 @@
 import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
-import { error, assert, assertL, fuel, range, last, makeFraction, every, any, unSingleton, assertDefined, assertEq } from './util.ts'
+import { error, assert, assertL, fuel, range, last, makeFraction, every, unSingleton, assertDefined, assertEq } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
 	if (w.length > s.length - i) return false
@@ -413,7 +413,7 @@ private expr(): Instr[] {
 		// spill stack to output
 		while (operatorStack.length > 0) {
 			let tos = last(operatorStack).decl
-			let tosStrength = any(tos.strength)
+			let tosStrength = <number>tos.strength
 			if (tosStrength < strength) break
 
 			// Handle associativity

@@ -110,7 +110,7 @@ export class Tunguska<A> {
 	async recv() {
 		if (this.stack.length <= 0)
 			return await this.v.recv()
-		return <A>this.stack.pop()
+		return this.stack.pop()
 	}
 
 	async peek() {
