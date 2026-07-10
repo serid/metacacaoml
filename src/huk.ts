@@ -1,6 +1,6 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any, unexpectedMatch } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any, unexpectedMatch, assertDefined } from './util.ts'
 
-import { InstrTag, ToplevelTag, type Instr, type Toplevel, type TypeExpr } from './syntax.ts'
+import { InstrTag, ToplevelTag, type Constructor, type Instr, type Toplevel, type TypeExpr } from './syntax.ts'
 import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
 
 //! Implements typechecking using an algorithm from
@@ -94,7 +94,7 @@ private stepIns() {
 private static invent(hint: string, taken: string[]) {
 	while (taken.includes(hint)) {
 		let [_, alpha, num] =
-			hint.match(/(\D*)(\d*)/)
+			hint.match(/(\D*)(\d*)/)!
 		let numstr = num===""?"0":parseInt(num,10)+1
 		hint = alpha + numstr
 	}
@@ -185,7 +185,7 @@ private normalize(tyExpr: TypeExpr): any {
 		throw new CompileError(tyExpr.span, log, undefined, { cause: e })
 	}
 	} catch (e) {
-		if (e.constructor === CompileError) throw e
+		if (e instanceof CompileError) throw e
 		throw new CompileError(tyExpr.span, undefined, undefined, { cause: e })
 	}
 }
@@ -347,7 +347,7 @@ private instantiateEvar(direction: Dexterity, alpha: string, other: Type) {
 		let inventions = this.inventEVars("Y", other.domain.length + 1)
 
 		let domain_names = [...inventions]
-		let codomain_name = domain_names.pop()
+		let codomain_name = assertDefined(domain_names.pop())
 
 		let ctxSnippet = inventions.map(mkEVar)
 		ctxSnippet.reverse()
@@ -454,7 +454,7 @@ private subtypeUi(ty1: Type, ty2: Type) {
 	try {
 		this.subtype(ty1, ty2)
 	} catch (e) {
-		assert(e.constructor !== CompileError)
+		assert(!(e instanceof CompileError))
 		throw new CompileError(this.ins().span, this.log.join("\n"),
 			`error: \`${showType(ty1)}' is not a subtype of \`${showType(ty2)}'`,
 			{ cause: e })
@@ -620,7 +620,7 @@ private infer() {
 		this.exitTyping(`-| ${pretty} => ${showType(ty)}`)
 		return ty
 	} catch (e) {
-		if (e.constructor === CompileError) throw e
+		if (e instanceof CompileError) throw e
 		throw new CompileError(this.ins().span, this.log.join("\n"), undefined, { cause: e })
 	}
 }
@@ -655,7 +655,7 @@ private check(ty: Type) {
 		nonExhaustiveMatch(ins satisfies never)
 	}
 	} catch (e) {
-		if (e.constructor === CompileError) throw e
+		if (e instanceof CompileError) throw e
 		throw new CompileError(this.ins().span, this.log.join("\n"), undefined, { cause: e })
 	}
 }
@@ -679,7 +679,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 			// at runtime and are thus not codegened (?)
 			value: new LateInit(item.gs.length===0
 			? {tag:"cons", fullName:symbol, args:[]}
-			: function*(...xs){
+			: function*(...xs: any[]){
 				return {tag:"cons", fullName:symbol, args:xs}
 			})
 		})
@@ -704,14 +704,14 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 				ty: {tag: "arrow", domain: c.fields, codomain: self},
 
 				// avoid codegen for constructors
-				value: new LateInit(function*(...args) {
+				value: new LateInit(function*(...args: any[]) {
 					let entries = args.map((arg,i)=>["_"+i,arg])
 					entries.push(["tag", Symbol.for(c.name)])
 					return Object.fromEntries(entries)
 				})
 			})
 		let ret = Huk.invent("R", item.gs)
-		let domain = [self].concat(normalConss.map(c=>({tag: "arrow",
+		let domain = [self].concat(normalConss.map((c: Constructor)=>({tag: "arrow",
 			domain: c.fields,
 			codomain: mkUse(ret)
 		})
@@ -768,6 +768,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 				this.check(codomain)
 				error("expected error: "+expected)
 			} catch (e) {
+				if (!(e instanceof Error)) error("expected an `Error` instance")
 				// If none of error messages match expectation, report discrepancy
 				// and rethrow
 				if (every(exceptionCauses(e), e => e.message !== expected)) {
@@ -793,7 +794,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 	}
 	return true
 	} catch (e) {
-		if (e.constructor === CompileError) throw e
+		if (e instanceof CompileError) throw e
 		throw new CompileError(this.item.span, this.log.join("\n"), undefined, { cause: e })
 	}
 }

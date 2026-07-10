@@ -20,8 +20,14 @@ export function assertEq(x: any, y: any) {
 	return x
 }
 
-export function assertDefined<A>(x: A | undefined): A {
-	assert(x !== undefined)
+export function assertDefined<A>(
+	x: A | undefined, e = "unexpected undefined"): A {
+	if (x === undefined) error(e)
+	return x
+}
+
+export function assertNonNull<A>(x: A | null, e = "unexpected null"): A {
+	if (x === null) error(e)
 	return x
 }
 
@@ -184,25 +190,18 @@ export class Pakulikha<A> {
 	}
 }
 
-export function step<A>(g: Generator<A, void, any>, arg?: any) {
-	let val = g.next(arg).value
-	assertL(val === undefined, () => "expected nothing, got " + prettyPrint(val))
+export function nextLast<A, Next>(
+	g: Generator<A, any, Next>, ...value: [] | [Next]) {
+	let iteratorResult = g.next(...value)
+	if (!iteratorResult.done) error("expected last")
+	return iteratorResult.value
 }
 
-export function nextLast<A, B>(g: Generator<A, B, any>, arg?: any) {
-	let iteratorResult = g.next(arg)
-	assert(iteratorResult.done, "expected last")
-	return <B>iteratorResult.value
-}
-
-export function getOne<A>(g: Generator<A, void, void>) {
-	let { value } = g.next()
-	assert(value !== undefined, "got undefined")
-	return <A>value
-}
-export function getOneOrDef<A>(g: Generator<A, void, void>, d: A) {
-	let { value } = g.next()
-	return value === undefined ? d : <A>value
+export function getOne<A, Next>(
+	g: Generator<A, any, any>, ...value: [] | [Next]) {
+	let iteratorResult = g.next(...value)
+	if (iteratorResult.done) error("expected not last")
+	return iteratorResult.value
 }
 
 
@@ -337,10 +336,12 @@ export function* bind(i: any, k: any) {
 
 export function* exceptionCauses(e: Error): Generator<Error, void, void> {
 	yield e
-	let fixpoint = <Error>e.cause
+	let fixpoint = e.cause
+	if (!(fixpoint instanceof Error)) error("expected an `Error` instance")
 	while (fixpoint !== undefined) {
 		yield fixpoint
 		fixpoint = any(fixpoint).cause
+		if (!(fixpoint instanceof Error)) error("expected an `Error` instance")
 	}
 }
 

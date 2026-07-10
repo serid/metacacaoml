@@ -1,6 +1,6 @@
 import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
-import { error, assert, assertL, fuel, range, last, makeFraction, every, unSingleton, assertDefined, assertEq } from './util.ts'
+import { error, assert, assertL, fuel, range, last, makeFraction, every, unSingleton, assertDefined, assertEq, assertNonNull } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
 	if (w.length > s.length - i) return false
@@ -10,8 +10,8 @@ function isPrefix(s: string, i: number, w: string) {
 }
 
 function unsignalNaN(x: HyperReal, message: string) {
-	assert(x !== signalingNan, message)
-	return <number>x
+	if (x === signalingNan) error(message)
+	return x
 }
 
 let identAnlautRule = /[a-zA-Z\-]/
@@ -218,9 +218,7 @@ private ident() {
 }
 
 private assertIdent() {
-	let id = this.ident()
-	assert(id !== null, "expected ident")
-	return id
+	return assertNonNull(this.ident(), "expected ident")
 }
 
 private stringLiteral(end: string) {
@@ -253,7 +251,7 @@ private generics() {
 	return gs
 }
 
-private binding(): Binding {
+private binding(): Binding | null {
 	let name = this.ident()
 	if (name === null) return null
 	this.assertWord(":")
@@ -264,7 +262,7 @@ private binding(): Binding {
 private bindings(): Binding[] {
 	let bs: Binding[] = []
 	while (!this.tryWord(")")) {
-		bs.push(this.binding())
+		bs.push(assertNonNull(this.binding(), "expected a binding"))
 	}
 	return bs
 }
@@ -284,7 +282,7 @@ private exprNoInfix(): Instr[] {
 	// 	if (isEmbraced) this.assertWord("}")
 	// 	return insQueue
 	} else if (/[0-9]/.test(this.peekChar())) {
-		insQueue.push({tag: InstrTag.int, span, data: this.uint()})
+		insQueue.push({tag: InstrTag.int, span, data: assertNonNull(this.uint())})
 	} else if (this.tryWord("@[")) {
 		insQueue.push({tag: InstrTag.array, span})
 		span = this.i
@@ -325,8 +323,7 @@ private exprNoInfix(): Instr[] {
 		insQueue.push(...this.expr())
 		return insQueue
 	} else {
-		let name = this.ident()
-		assert(name !== null, "expected expression")
+		let name = assertNonNull(this.ident(), "expected expression")
 		insQueue.push({tag: InstrTag.use, span, name})
 	}
 

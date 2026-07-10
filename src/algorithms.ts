@@ -3,7 +3,7 @@ import { mkArray, indices } from './util.ts'
 export function* toposort<A>(
 	vertices: A[], edges: (_: A) => number[]): Iterable<A> {
 	let visited = mkArray(vertices.length, false)
-	function* go(i: number) {
+	function* go(i: number): Iterable<A> {
 		if (visited[i]) return
 		visited[i] = true
 		let v = vertices[i]

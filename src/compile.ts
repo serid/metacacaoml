@@ -228,7 +228,7 @@ compile() {
 		this.log(`normalizations count: ` + this.tyck.normalCounter)
 		return this.cg.getCode()
 	} catch (e) {
-		if (e.constructor !== CompileError) throw e
+		if (!(e instanceof CompileError)) throw e
 		this.reportError(e)
 		assert(e.cause!==undefined, "expected cause")
 		throw e.cause
@@ -309,7 +309,7 @@ function showExpr0(arena: Instr[], boxI: number[], builder: string[]) {
 }
 
 export function showExpr(arena: Instr[], i: number) {
-	let builder = []
+	let builder: string[] = []
 	showExpr0(arena, [i], builder)
 	return builder.join("")
 }

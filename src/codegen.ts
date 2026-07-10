@@ -140,7 +140,7 @@ private expr(): string {
 		nonExhaustiveMatch(ins satisfies never)
 	}
 	} catch (e) {
-		if (e.constructor === CompileError) throw e
+		if (e instanceof CompileError) throw e
 		throw new CompileError(this.ins().span, undefined, undefined, { cause: e })
 	}
 }
@@ -204,7 +204,7 @@ private codegen_(): ObjectMap<string> {
 	}
 	return toplevels
 	} catch (e) {
-		if (e.constructor === CompileError) throw e
+		if (e instanceof CompileError) throw e
 		throw new CompileError(this.item.span, undefined, undefined, { cause: e })
 	}
 }

@@ -5,6 +5,7 @@
 		"module": "Preserve",
 		"target": "ESNext",
 		"verbatimModuleSyntax": true,
-		"lib": ["ESNext"]
+		"lib": ["ESNext"],
+		"types": ["node"]
 	}
 }
