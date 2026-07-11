@@ -2,7 +2,7 @@
 	"scripts": {
 		"main": "bun src/main.ts",
 		"test": "bun src/tes.ts",
-		"lint": "find src -type f -exec sed -i -E 's/\\s$//g; :A; s/^(\\t*)(  )/\\1\\t/; tA' {} +; tsgo && deno lint && ! rg '^\\s*( )' --glob=!flake.lock --glob=!package-lock.json"
+		"lint": "find src -type f -exec sed -i -E 's/\\s$//g; :A; s/^(\\t*)(  )/\\1\\t/; tA' {} +; tsgo && deno lint && ! rg '^\\s*( )' --glob=!flake.lock --glob=!package-lock.json --glob=!npins/"
 	},
 
 	"dependencies": {
