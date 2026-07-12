@@ -31,6 +31,10 @@ export function assertNonNull<A>(x: A | null, e = "unexpected null"): A {
 	return x
 }
 
+export function todo(msg?: string): never {
+	error(msg === undefined ? "unimplemented" : "todo: " + msg)
+}
+
 export function typeof2(o: any) {
 	if (Array.isArray(o)) return "array"
 	return typeof o

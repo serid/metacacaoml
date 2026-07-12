@@ -283,23 +283,21 @@ function showExpr0(arena: Instr[], boxI: number[], builder: string[]) {
 		if (ins.metName !== null)
 			builder.push(".", ins.metName)
 		builder.push("(")
-		if (![InstrTag.endapp, InstrTag.applam].includes(arena[boxI[0]].tag))
+		if (arena[boxI[0]].tag !== InstrTag.endapp)
 			showExpr0(arena, boxI, builder)
-		while (![InstrTag.endapp, InstrTag.applam].includes(arena[boxI[0]].tag)) {
+		while (arena[boxI[0]].tag !== InstrTag.endapp) {
 			builder.push(" ")
 			showExpr0(arena, boxI, builder)
 		}
 		builder.push(")")
-		while (arena[boxI[0]].tag===InstrTag.applam) {
-			builder.push(" { ", any(arena[boxI[0]]).ps.join(" "), ". ")
-			boxI[0]++
-			showExpr0(arena, boxI, builder)
-			builder.push(" }")
-		}
 		boxI[0]++
 		break
+	case InstrTag.lam:
+		builder.push("{ ", ins.ps.join(" "), ". ")
+		showExpr0(arena, boxI, builder)
+		builder.push(" }")
+		break
 	case InstrTag.endapp:
-	case InstrTag.applam:
 	case InstrTag.endarrow:
 	case InstrTag.endarray:
 		unexpectedMatch(ins); break

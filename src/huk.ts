@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any, unexpectedMatch, assertDefined } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any, unexpectedMatch, assertDefined, todo } from './util.ts'
 
 import { InstrTag, ToplevelTag, type Constructor, type Instr, type Toplevel, type TypeExpr } from './syntax.ts'
 import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
@@ -173,7 +173,8 @@ private normalize(tyExpr: TypeExpr): any {
 	nakedCtx.ensureFixtureDependencies()
 	let cgs = nakedCtx.cg.codegen()
 	assertEq(Object.keys(cgs), ["_"])
-	let obj = `"use strict";\n` + cgs._
+	let obj = `  "use strict";\n` + cgs._
+	// write(`Normalization №${this.root.normalCounter} Obj:\n${cgs._}\n`)
 
 	try {
 		let g = new GeneratorFunction(...paramNames, obj)(...args)
@@ -538,61 +539,12 @@ private infer_(): Type {
 		if (fty.tag !== "arrow") error()
 
 		for (let par of view(fty.domain, isMethod?1:0)) {
-			// substitute each parameter since since context grows in information as we check arguments
+			// substitute each parameter since context grows in information as we check arguments
 			par = this.substitute(par)
 			let ins = this.nextIns()
 			assertL(ins.tag !== InstrTag.endapp, () => "expected argument of type " +
 				showType(par))
-			// simple application
-			if (ins.tag !== InstrTag.applam) {
-				this.check(par)
-				continue
-			}
-
-			// application of trailing lambda
-			let ps = ins.ps
-			this.k++
-			if (par.tag !== "euse") {
-				if (par.tag !== "arrow") error()
-				assertEq(par.domain.length, ps.length)
-			} else {
-				let newPar: Type = {
-					tag:"arrow",
-					domain:ps.map(_=>mkEUse(this.allocEVar("H"))),
-					codomain:mkEUse(this.allocEVar("CH"))
-				}
-				// oughh i need to factor out lambdas into their own expr
-				// to separate synthesis and checking for them and also allow switching
-				// from latter to former
-				this.instantiateEvar(Dexterity.Left, par.name, newPar)
-				par = newPar
-			}
-
-			// Introduce a marker to stack to clean up everything after it when
-			// body tyck concludes. ID is index of instruction that introduces lambda
-			let id = this.k
-			this.ctx.push({
-				tag: "mark",
-				id
-			})
-
-			for (let [p, subpar] of zip(ps, par.domain)) {
-				this.ctx.push({
-					tag: "var",
-					name: p,
-					ty: subpar
-				})
-			}
-			this.check(par.codomain)
-
-			// Remove from context the prepared marker and everything after it
-			// including vars and body tyck remnants
-			// Evars introduced for arrow remain
-			let ix = this.ctx.findLastIndex(x =>
-				x.tag === "mark" &&
-				x.id === id)
-			assert(ix >= 0) // invariant
-			this.ctx.splice(ix, this.ctx.length - ix)
+			this.check(par)
 		}
 
 		assertEq(this.stepIns().tag, InstrTag.endapp) // invariant
@@ -602,8 +554,9 @@ private infer_(): Type {
 	case InstrTag.any:
 	case InstrTag.arrow:
 		return useType
+	case InstrTag.lam:
+		todo(); break
 	case InstrTag.endapp:
-	case InstrTag.applam:
 	case InstrTag.endarrow:
 	case InstrTag.endarray:
 		unexpectedMatch(ins); break
@@ -627,9 +580,10 @@ private infer() {
 
 private check(ty: Type) {
 	try {
-	let ins = this.stepIns()
+	let ins = this.nextIns()
 	switch (ins.tag) {
 	case InstrTag.native:
+		this.k++
 		return
 	case InstrTag.strlit:
 	case InstrTag.int:
@@ -639,14 +593,58 @@ private check(ty: Type) {
 	// Types
 	case InstrTag.any:
 	case InstrTag.arrow: {
-		this.k--
 		let ty2 = this.infer()
 		this.subtypeUi(this.substitute(ty2),
 			this.substitute(ty))
 		return
 	}
+	case InstrTag.lam: {
+		this.k++
+		let ps = ins.ps
+		if (ty.tag !== "euse") {
+			if (ty.tag !== "arrow") error()
+			assertEq(ty.domain.length, ps.length)
+		} else {
+			let newTy: Type = {
+				tag:"arrow",
+				domain:ps.map(_=>mkEUse(this.allocEVar("H"))),
+				codomain:mkEUse(this.allocEVar("CH"))
+			}
+			// oughh i need to factor out lambdas into their own expr
+			// to separate synthesis and checking for them and also allow switching
+			// from latter to former
+			this.instantiateEvar(Dexterity.Left, ty.name, newTy)
+			ty = newTy
+		}
+
+		// Introduce a marker to stack to clean up everything after it when
+		// body tyck concludes. ID is index of instruction that introduces lambda
+		let id = this.k
+		this.ctx.push({
+			tag: "mark",
+			id
+		})
+
+		for (let [p, pTy] of zip(ps, ty.domain)) {
+			this.ctx.push({
+				tag: "var",
+				name: p,
+				ty: pTy
+			})
+		}
+		this.check(ty.codomain)
+
+		// Remove from context the prepared marker and everything after it
+		// including vars and body tyck remnants
+		// Evars introduced for arrow remain
+		let ix = this.ctx.findLastIndex(x =>
+			x.tag === "mark" &&
+			x.id === id)
+		assert(ix >= 0) // invariant
+		this.ctx.splice(ix, this.ctx.length - ix)
+		return
+	}
 	case InstrTag.endapp:
-	case InstrTag.applam:
 	case InstrTag.endarrow:
 	case InstrTag.endarray:
 		unexpectedMatch(ins)

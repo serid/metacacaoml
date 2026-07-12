@@ -1,4 +1,4 @@
-import { nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap, any, assertEq, unexpectedMatch } from './util.ts'
+import { nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap, any, unexpectedMatch, last, assertDefined, unSingleton } from './util.ts'
 
 import { InstrTag, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
 import { CompileError, ItemCtx } from './compile.ts'
@@ -16,7 +16,9 @@ export function mangle(path: string) {
 export class ItemCodegen {
 private k: number = 0 // points one past the current instruction
 private nextVar: number = 0
-private code: string[] = []
+// a stack of stringbuilders. each nested lambda has its own slot in stack
+// this is needed to return lambda code in bulk
+private code: string[][] = [[]]
 
 constructor(
 	private itemCtx: ItemCtx,
@@ -45,26 +47,30 @@ private alloc() {
 }
 
 private unshiftCode() {
-	let out = this.code.join("")
-	this.code = []
+	let out = unSingleton(this.code).join("")
+	this.code = [[]]
 	return out
+}
+
+private pushCode(s: string) {
+	last(this.code).push(s)
 }
 
 private emitSsa(e: string) {
 	let ix = this.alloc()
-	this.code.push(`  const ${ix} = ${e}\n`)
+	this.pushCode(`  const ${ix} = ${e}\n`)
 	return ix
 }
 
 private emitYieldStar(what: string): string {
 	let yieldReturnVar = this.alloc()
-	this.code.push(`  let ${yieldReturnVar}; while (true) { let pair = ${what}` +
-		`.next(); if (pair.done) { ${yieldReturnVar} = pair.value; break }` +
-		` yield pair.value }\n`)
+	this.pushCode(`  let ${yieldReturnVar}; while (!(${yieldReturnVar} = ${what}.next()).done) { yield ${yieldReturnVar}.value }` +
+		` ${yieldReturnVar} = ${yieldReturnVar}.value;\n`
+	)
 	return yieldReturnVar
 }
 
-private expr(): string {
+private _expr(): string {
 	try {
 	let insLocation = this.k
 	let ins = this.stepIns()
@@ -83,40 +89,31 @@ private expr(): string {
 	case InstrTag.array: {
 		let ixs: string[] = []
 		while (this.nextIns().tag!==InstrTag.endarray)
-			ixs.push(this.expr())
+			ixs.push(this._expr())
 		this.k++
 		return this.emitSsa(`[${join(ixs)}]`)
 	}
 	case InstrTag.app: {
 		let ixs: string[] = []
 		// generate strict arguments
-		while (![InstrTag.endapp, InstrTag.applam].includes(this.nextIns().tag))
-			ixs.push(this.expr())
+		while (this.nextIns().tag !== InstrTag.endapp)
+			ixs.push(this._expr())
+		this.k++
 
 		// For methods, fetch full name produced by tyck, otherwise the fun is first expression
 		let fun = ins.metName !== null ?
 			"_fixtures_."+this.itemCtx.tyck.getMethodSymbolAt(insLocation) :
 			ixs.shift()
 
-		// A contrived codegen spell indeed
-		// Put no commas when no normal arguments are present
-		// Put a comma after each normal argument since they are followed
-		// by lambdas
-		let genIx = this.emitSsa(`${fun}(${ixs.map(x=>x+",").join(" ")}`)
-
-		// generate trailing lambdas
-		while (true) {
-		let ins = this.stepIns()
-		if (ins.tag === InstrTag.endapp) break
-		assertEq(ins.tag, InstrTag.applam)
-
-		this.code.push(`  function*(${join(any(ins).ps)}) {\n`)
-		let retIx = this.expr()
-		this.code.push(`  return ${retIx}\n  },\n`)
-		}
-
-		this.code.push(`  );\n`)
+		let genIx = this.emitSsa(`${fun}(${ixs.join(", ")});\n`)
 		return this.emitYieldStar(genIx)
+	}
+	case InstrTag.lam: {
+		// Push a new lambda level, then collect into one snippet for return
+		this.code.push([`function*(${join(ins.ps)}) {\n`])
+		let retIx = this._expr()
+		this.pushCode(`  return ${retIx}\n  }`)
+		return assertDefined(this.code.pop()).join("")
 	}
 
 	// types
@@ -126,13 +123,12 @@ private expr(): string {
 	case InstrTag.arrow: {
 		let domain: string[] = []
 		while (this.nextIns().tag !== InstrTag.endarrow)
-			domain.push(this.expr())
+			domain.push(this._expr())
 		this.k++
-		let codomain = this.expr()
+		let codomain = this._expr()
 		return `{tag:"arrow", domain:[${join(domain)}], codomain:${codomain}}`
 	}
 	case InstrTag.endapp:
-	case InstrTag.applam:
 	case InstrTag.endarrow:
 	case InstrTag.endarray:
 		unexpectedMatch(ins);	break
@@ -143,6 +139,13 @@ private expr(): string {
 		if (e instanceof CompileError) throw e
 		throw new CompileError(this.ins().span, undefined, undefined, { cause: e })
 	}
+}
+
+private expr(): string {
+	let x = this._expr()
+	// if (x.includes("function*"))
+		// write(`expr: ${x}\n`)
+	return x
 }
 
 // list of key-value pairs to add to the global object
@@ -160,7 +163,7 @@ private codegen_(): ObjectMap<string> {
 		for (let c of item.conss) {
 			let ps = c.fields.map(x=>x.name)
 			let bs = join(ps)
-			this.code.push(
+			this.pushCode(
 				`function*(${bs}) {\n` +
 				`  return {tag: Symbol.for("${c.name}"), ${bs}}\n}\n`)
 			let as = join(ps.map(x=>"self."+x))
@@ -178,23 +181,23 @@ private codegen_(): ObjectMap<string> {
 		break
 	}
 	case ToplevelTag._let: {
-		this.code.push(`(function*() {\n`)
+		this.pushCode(`(function*() {\n`)
 		let retIx = this.expr()
-		this.code.push(`  return ${retIx}\n})().next().value`)
+		this.pushCode(`  return ${retIx}\n})().next().value`)
 		mapInsert(toplevels, item.name, this.unshiftCode())
 		break
 	}
 	case ToplevelTag.fun: {
 		let bs = item.bs.map(x=>x.name)
-		this.code.push(`(function*(${join(bs)}) {\n`)
+		this.pushCode(`(function*(${join(bs)}) {\n`)
 		let retIx2 = this.expr()
 
-		this.code.push(`  return ${retIx2}\n})`)
+		this.pushCode(`  return ${retIx2}\n})`)
 		mapInsert(toplevels, this.itemCtx.getToplevelSymbol(), this.unshiftCode())
 		break
 	}
 	case ToplevelTag.typeexpr:
-		this.code.push(`  return ${this.expr()}`)
+		this.pushCode(`  return ${this.expr()}`)
 		mapInsert(toplevels, "_", this.unshiftCode())
 		break
 	case ToplevelTag.infixdecl:

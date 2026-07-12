@@ -68,7 +68,7 @@ export namespace InstrTag {
 	export const use = Symbol("use")
 	export const app = Symbol("app")
 	export const endapp = Symbol("endapp")
-	export const applam = Symbol("applam")
+	export const lam = Symbol("lam")
 	export const array = Symbol("array")
 	export const endarray = Symbol("endarray")
 
@@ -84,7 +84,7 @@ export type Instr =
 	| { tag: typeof InstrTag.use, span: number, name: string }
 	| { tag: typeof InstrTag.app, span: number, metName: string | null }
 	| { tag: typeof InstrTag.endapp, span: number }
-	| { tag: typeof InstrTag.applam, span: number, ps: string[] }
+	| { tag: typeof InstrTag.lam, span: number, ps: string[] }
 	| { tag: typeof InstrTag.array, span: number }
 	| { tag: typeof InstrTag.endarray, span: number }
 
@@ -351,7 +351,7 @@ private exprNoInfix(): Instr[] {
 			let isEmbraced = this.char() === "{"
 			this.tryWhitespace()
 			let ps = this.idents(".")
-			insQueue.push({tag: InstrTag.applam, span: span2, ps})
+			insQueue.push({tag: InstrTag.lam, span: span2, ps})
 			insQueue.push(...this.expr())
 			if (isEmbraced) this.assertWord("}")
 			span = this.i
