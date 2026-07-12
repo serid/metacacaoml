@@ -1,6 +1,6 @@
 import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
-import { error, assert, assertL, fuel, range, last, makeFraction, every, unSingleton, assertDefined, assertEq, assertNonNull } from './util.ts'
+import { error, assert, assertL, fuel, range, last, makeFraction, every, unSingleton, assertDefined, assertEq, assertNonNull, view } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string) {
 	if (w.length > s.length - i) return false
@@ -279,6 +279,7 @@ private lambda(outInss: Instr[]) {
 }
 
 private exprNoInfix(): Instr[] {
+	// codepoint index of expression start
 	let span = this.i
 	let insQueue: Instr[] = []
 	if (this.tryWord('"')) {
@@ -291,41 +292,40 @@ private exprNoInfix(): Instr[] {
 		insQueue.push({tag: InstrTag.int, span, data: assertNonNull(this.uint())})
 	} else if (this.tryWord("@[")) {
 		insQueue.push({tag: InstrTag.array, span})
-		span = this.i
+		let closingSpan = this.i
 		while (!this.tryWord("]")) {
 			insQueue.push(...this.expr())
-			span = this.i
+			closingSpan = this.i
 		}
-		insQueue.push({tag: InstrTag.endarray, span})
+		insQueue.push({tag: InstrTag.endarray, span: closingSpan})
 	} else if (this.tryWord("(")) {
-		span = this.i
-		let subexprs: Instr[][] = []
+		let closingSpan = this.i
+		let subexprs: [number, Instr[]][] = []
 		while (!this.tryWord(")")) {
-			subexprs.push(this.expr())
-			span = this.i
+			subexprs.push([this.i, this.expr()])
+			closingSpan = this.i
 		}
 
 		// Elaborate (1) to 1
 		// Elaborate (1 2 3) to Pair(1 Pair(2 3))
-		for (let i of range(subexprs.length-1)) {
-			insQueue.push({tag: InstrTag.app, span, metName:null})
-			insQueue.push({tag: InstrTag.use, span,
-				name:"PairᐅNew"})
-			insQueue.push(...subexprs[i])
+		for (let [seSpan, se] of view(subexprs, 0, subexprs.length - 1)) {
+			insQueue.push({tag: InstrTag.app, span: seSpan, metName:null})
+			insQueue.push({tag: InstrTag.use, span: seSpan, name:"PairᐅNew"})
+			insQueue.push(...se)
 		}
-		insQueue.push(...last(subexprs))
+		insQueue.push(...last(subexprs)[1])
 		for (let _ of range(subexprs.length-1))
-			insQueue.push({tag: InstrTag.endapp, span})
+			insQueue.push({tag: InstrTag.endapp, span: closingSpan})
 	} else if (this.tryWord("@any")) {
 		return [{tag: InstrTag.any, span}]
 	} else if (this.tryWord("[")) {
 		insQueue.push({tag: InstrTag.arrow, span})
-		span = this.i
+		let closingSpan = this.i
 		while (!this.tryWord("]")) {
 			insQueue.push(...this.expr())
-			span = this.i
+			closingSpan = this.i
 		}
-		insQueue.push({tag: InstrTag.endarrow, span})
+		insQueue.push({tag: InstrTag.endarrow, span: closingSpan})
 		insQueue.push(...this.expr())
 		return insQueue
 	} else {
@@ -345,19 +345,19 @@ private exprNoInfix(): Instr[] {
 	if (this.notPastEof() && "(λ{".includes(this.peekChar())) {
 		insQueue.unshift({tag: InstrTag.app, span, metName})
 		metName = null
-		span = this.i
+		let closingSpan = this.i
 		if (this.tryWord("("))
 			while (!this.tryWord(")")) {
 				insQueue.push(...this.expr())
-				span = this.i
+				closingSpan = this.i
 			}
 
 		// lambda arguments allowed after closing parenthesis
 		while (this.notPastEof() && "λ{".includes(this.peekChar())) {
 			this.lambda(insQueue)
-			span = this.i
+			closingSpan = this.i
 		}
-		insQueue.push({tag: InstrTag.endapp, span})
+		insQueue.push({tag: InstrTag.endapp, span: closingSpan})
 		continue
 	}
 
