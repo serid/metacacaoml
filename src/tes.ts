@@ -16,17 +16,6 @@ function test(src: string) {
 
 async function main() {
 	test(await readFile("./src/test.meml.rs", { encoding:"utf-8" }))
-	/* test(`
-fun .test-to-Array('A i:Iter(A)): Array(A) =
-	# todo: buff up type inference to allow \`as\` here
-	@[] as fun λ xs.
-	i.for-each { x.
-		xs.push(x)
-	};
-	xs
-
-fun main(): Iota =
-Iota/Iota()`) */
 }
 
 await main()

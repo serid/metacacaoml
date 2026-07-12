@@ -7,11 +7,10 @@ fun anyways(-:@any): Iota = Iota/Iota()
 fun seq('A -:@any other:A): A = other
 
 fun id('A x:A): A = x
-fun fun('A f:A): A = f
 fun compose('A 'B 'C g:[B]C f:[A]B): [A]C =
-	fun λ x. g(f(x))
+	λ x. g(f(x))
 fun compose2('A 'B 'C 'D g:[C]D f:[A B]C): [A B]D =
-	fun λ x y. g(f(x y))
+	λ x y. g(f(x y))
 
 fun let('A 'B x:A f:[A]B): B = f(x)
 fun write('A x:A): Iota = anyways(
@@ -36,7 +35,7 @@ class Ordering
 | Gt()
 end
 fun Ordering/from-lt-eq('A lt:[A A]Bool eq:[A A]Bool): [A A]Ordering =
-	fun λ x y.
+	λ x y.
 	eq(x y).then(Ordering/Eq)
 	{ . lt(x y).then(Ordering/Lt Ordering/Gt) }
 fun .to-Int(ord:Ordering): Int =
@@ -125,7 +124,7 @@ fun .push('A xs:Array(A) x:A): Iota =
 fun .shallow-copy('A xs:Array(A)): Array(A) =
 	native[|[...xs]|]
 fun .sorted('A xs:Array(A) cmp:[A A]Ordering): Array(A) =
-	compose2(Ordering/to-Int cmp) as fun λ cmp.
+	compose2(Ordering/to-Int cmp) as λ cmp.
 	native[|[...xs].sort((x,y)=>cmp(x,y).next().value)|]
 fun .slice('A xs:Array(A) i:Int j:Int): Array(A) =
 	native[|xs.slice(i, j)|]
@@ -153,8 +152,7 @@ fun .for-each('A i:Iter(A) f:[A]Iota): Iota = Option/elim(i.unpack()())
 	{ . Iota/Iota() }
 	{ x. f(x); i.for-each(f) }
 fun .to-Array('A i:Iter(A)): Array(A) =
-	# todo: buff up type inference to allow `as` here
-	let(@[]) λ xs.
+	@[] as λ xs.
 	i.for-each { x.
 		xs.push(x)
 	};
@@ -165,7 +163,7 @@ fun .to-Iter('A xs:Array(A)): Iter(A) =
 	let(i.get()) λ iv.
 	Bool/elim(iv < xs.length())
 	{ . Option/None() }
-	{ . xs.get(iv) as fun λ elem.
+	{ . xs.get(iv) as λ elem.
 		i.set(iv.increment()); Option/Some(elem) }
 fun .map('A 'B i:Iter(A) f:[A]B): Iter(B) =
 	Iter/New λ .
@@ -178,7 +176,7 @@ fun .name(t:Type): String = native[|t.fullName|]
 
 fun make-tuple-type(ts:Array(Type)): Type =
 	Pair/elim(ts.unsnoc().unwrap()) λ init last.
-	init.reverse() as fun λ -.
+	let(init.reverse()) λ -.
 	let(Box/New(last)) λ acc.
 	init.to-Iter().for-each { t.
 		acc.modify λ x. Pair(t x)

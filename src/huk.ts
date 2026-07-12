@@ -1,4 +1,4 @@
-import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any, unexpectedMatch, assertDefined, todo } from './util.ts'
+import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any, unexpectedMatch, assertDefined } from './util.ts'
 
 import { InstrTag, ToplevelTag, type Constructor, type Instr, type Toplevel, type TypeExpr } from './syntax.ts'
 import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
@@ -481,6 +481,40 @@ private ensureGlobalTyckedAndInstantiate(symbol: string, msg: string): Type {
 	return this.instantiate(gb.gs, gb.ty)
 }
 
+// Shared algorithm body for lambda checking and synthesis
+private lambdaCheckOrInfer(ty: Type, ps: string[]) {
+	if (ty.tag !== "arrow") error()
+	assertEq(ty.domain.length, ps.length)
+
+	// Introduce a marker to stack to clean up everything after it when
+	// body tyck concludes.
+	// ID is index of first instruction in lambda, though it could be anything as
+	// long as each lambda gets a unique one within a function tyck.
+	let id = this.k
+	this.ctx.push({
+		tag: "mark",
+		id
+	})
+
+	for (let [p, pTy] of zip(ps, ty.domain)) {
+		this.ctx.push({
+			tag: "var",
+			name: p,
+			ty: pTy
+		})
+	}
+	this.check(ty.codomain)
+
+	// Remove from context the prepared marker and everything after it
+	// including vars and body tyck remnants
+	// Evars introduced for arrow remain
+	let ix = this.ctx.findLastIndex(x =>
+		x.tag === "mark" &&
+		x.id === id)
+	assert(ix >= 0) // invariant
+	this.ctx.splice(ix, this.ctx.length - ix)
+}
+
 private infer_(): Type {
 	let insLocation = this.k
 	let ins = this.stepIns()
@@ -554,8 +588,16 @@ private infer_(): Type {
 	case InstrTag.any:
 	case InstrTag.arrow:
 		return useType
-	case InstrTag.lam:
-		todo(); break
+	case InstrTag.lam: {
+		let ps = ins.ps
+		let newTy: Type = {
+			tag:"arrow",
+			domain:ps.map(_=>mkEUse(this.allocEVar("H"))),
+			codomain:mkEUse(this.allocEVar("CH"))
+		}
+		this.lambdaCheckOrInfer(newTy, ps)
+		return newTy
+	}
 	case InstrTag.endapp:
 	case InstrTag.endarrow:
 	case InstrTag.endarray:
@@ -578,6 +620,12 @@ private infer() {
 	}
 }
 
+private switchCheckToInfer(ty: Type) {
+	let ty2 = this.infer()
+	this.subtypeUi(this.substitute(ty2),
+		this.substitute(ty))
+}
+
 private check(ty: Type) {
 	try {
 	let ins = this.nextIns()
@@ -592,56 +640,17 @@ private check(ty: Type) {
 	case InstrTag.app:
 	// Types
 	case InstrTag.any:
-	case InstrTag.arrow: {
-		let ty2 = this.infer()
-		this.subtypeUi(this.substitute(ty2),
-			this.substitute(ty))
+	case InstrTag.arrow:
+		this.switchCheckToInfer(ty)
 		return
-	}
 	case InstrTag.lam: {
+		if (ty.tag === "euse") {
+			// checking against unknown, switch to inference
+			this.switchCheckToInfer(ty)
+			return
+		}
 		this.k++
-		let ps = ins.ps
-		if (ty.tag !== "euse") {
-			if (ty.tag !== "arrow") error()
-			assertEq(ty.domain.length, ps.length)
-		} else {
-			let newTy: Type = {
-				tag:"arrow",
-				domain:ps.map(_=>mkEUse(this.allocEVar("H"))),
-				codomain:mkEUse(this.allocEVar("CH"))
-			}
-			// oughh i need to factor out lambdas into their own expr
-			// to separate synthesis and checking for them and also allow switching
-			// from latter to former
-			this.instantiateEvar(Dexterity.Left, ty.name, newTy)
-			ty = newTy
-		}
-
-		// Introduce a marker to stack to clean up everything after it when
-		// body tyck concludes. ID is index of instruction that introduces lambda
-		let id = this.k
-		this.ctx.push({
-			tag: "mark",
-			id
-		})
-
-		for (let [p, pTy] of zip(ps, ty.domain)) {
-			this.ctx.push({
-				tag: "var",
-				name: p,
-				ty: pTy
-			})
-		}
-		this.check(ty.codomain)
-
-		// Remove from context the prepared marker and everything after it
-		// including vars and body tyck remnants
-		// Evars introduced for arrow remain
-		let ix = this.ctx.findLastIndex(x =>
-			x.tag === "mark" &&
-			x.id === id)
-		assert(ix >= 0) // invariant
-		this.ctx.splice(ix, this.ctx.length - ix)
+		this.lambdaCheckOrInfer(ty, ins.ps)
 		return
 	}
 	case InstrTag.endapp:

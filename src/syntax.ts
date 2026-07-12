@@ -267,6 +267,17 @@ private bindings(): Binding[] {
 	return bs
 }
 
+private lambda(outInss: Instr[]) {
+	// assumption: this.notPastEof() && "λ{".includes(this.peekChar())
+	let span = this.i
+	let isEmbraced = this.char() === "{"
+	this.tryWhitespace()
+	let ps = this.idents(".")
+	outInss.push({tag: InstrTag.lam, span, ps})
+	outInss.push(...this.expr())
+	if (isEmbraced) this.assertWord("}")
+}
+
 private exprNoInfix(): Instr[] {
 	let span = this.i
 	let insQueue: Instr[] = []
@@ -274,13 +285,8 @@ private exprNoInfix(): Instr[] {
 		insQueue.push({tag: InstrTag.strlit, span, data: this.stringLiteral('"')})
 	} else if (this.tryWord("native[|")) {
 		insQueue.push({tag: InstrTag.native, span, code: this.stringLiteral("|]")})
-	// } else if ("λ{".includes(this.peekChar())) {
-	// 	let isEmbraced = this.char() === "{"
-	// 	this.tryWhitespace()
-	// 	let ps = this.idents(".")
-	// 	insQueue.push({tag: Syntax.lam, span, ps, body: this.expr()})
-	// 	if (isEmbraced) this.assertWord("}")
-	// 	return insQueue
+	} else if ("λ{".includes(this.peekChar())) {
+		this.lambda(insQueue)
 	} else if (/[0-9]/.test(this.peekChar())) {
 		insQueue.push({tag: InstrTag.int, span, data: assertNonNull(this.uint())})
 	} else if (this.tryWord("@[")) {
@@ -330,13 +336,12 @@ private exprNoInfix(): Instr[] {
 	while (true) {
 	span = this.i
 
+	// try parsing a function application, start with possible method name
 	let metName = null
 	if (this.tryWord(".")) {
 		metName = this.assertIdent()
 	}
 
-	// try parsing a function application
-	// lambdas don't need round parentheses ()
 	if (this.notPastEof() && "(λ{".includes(this.peekChar())) {
 		insQueue.unshift({tag: InstrTag.app, span, metName})
 		metName = null
@@ -346,14 +351,10 @@ private exprNoInfix(): Instr[] {
 				insQueue.push(...this.expr())
 				span = this.i
 			}
+
+		// lambda arguments allowed after closing parenthesis
 		while (this.notPastEof() && "λ{".includes(this.peekChar())) {
-			let span2 = this.i
-			let isEmbraced = this.char() === "{"
-			this.tryWhitespace()
-			let ps = this.idents(".")
-			insQueue.push({tag: InstrTag.lam, span: span2, ps})
-			insQueue.push(...this.expr())
-			if (isEmbraced) this.assertWord("}")
+			this.lambda(insQueue)
 			span = this.i
 		}
 		insQueue.push({tag: InstrTag.endapp, span})
