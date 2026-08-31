@@ -63,7 +63,7 @@ infix at 50. ">=" = ".ge"
 infix right at .0 ";" = "seq"
 infix right at .0 "as" = "let"
 
-class Int end
+axiom Int
 let -1: Int = 0 - 1
 fun .increment(x:Int): Int = x + 1
 fun .lt(x:Int y:Int): Bool = Bool/from-native(native[|x<y|])
@@ -75,7 +75,7 @@ fun .mul(x:Int y:Int): Int = native[|x*y|]
 fun .div(x:Int y:Int): Int = native[|x/y|]
 fun .rem(x:Int y:Int): Int = native[|x%y|]
 
-class String end
+axiom String
 fun .lt(x:String y:String): Bool = Bool/from-native(native[|x<y|])
 fun .eq(x:String y:String): Bool = Bool/from-native(native[|x===y|])
 let String/cmp: [String String]Ordering =
@@ -114,7 +114,7 @@ fun .bind('A 'B self:Option(A) k:[A]Option(B)): Option(B) =
 fun .map('A 'B self:Option(A) f:[A]B): Option(B) =
 	self.bind(compose(Option/Some f))
 
-class Array 'A end
+axiom Array 'A
 fun .length('A xs:Array(A)): Int =
 	native[|xs.length|]
 fun .get('A xs:Array(A) i:Int): A =
@@ -171,7 +171,7 @@ fun .map('A 'B i:Iter(A) f:[A]B): Iter(B) =
 	{ . Option/None() }
 	{ x. Option/Some(f(x)) }
 
-class Type end
+axiom Type
 fun .name(t:Type): String = native[|t.fullName|]
 
 fun make-tuple-type(ts:Array(Type)): Type =

@@ -674,6 +674,25 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 	try {
 	let item = this.item
 	switch (item.tag) {
+	case ToplevelTag.axiom: {
+		let symbol = item.name
+		mapInsert(this.root.globals, symbol, {
+			gs: item.gs,
+			ty: item.gs.length===0
+			? useType
+			: {tag:"arrow", domain:item.gs.map(_=>useType), codomain:useType},
+			// todo: use codegen to get the value.. except axioms are not present
+			// at runtime and are thus not codegened (?)
+			value: new LateInit(item.gs.length===0
+			? {tag:"cons", fullName:symbol, args:[]}
+			: function*(...xs: any[]){
+				return {tag:"cons", fullName:symbol, args:xs}
+			})
+		})
+
+
+		return false
+	}
 	case ToplevelTag.cls: {
 		let symbol = first(this.itemCtx.getToplevelSymbols())
 		// add type constructor to globals

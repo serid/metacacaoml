@@ -42,6 +42,7 @@ export type Binding = { name: string, type: TypeExpr }
 // A Toplevel is the syntactic part of an Item data structure
 export namespace ToplevelTag {
 	export const typeexpr = Symbol("type-expr")
+	export const axiom = Symbol("axiom")
 	export const cls = Symbol("cls")
 	export const _let = Symbol("let")
 	export const fun = Symbol("fun")
@@ -52,6 +53,8 @@ export type TypeExpr =
 	{ tag: typeof ToplevelTag.typeexpr, span: number, arena: Instr[] }
 export type Toplevel =
 	| TypeExpr
+	| { tag: typeof ToplevelTag.axiom, span: number,
+		name: string, gs: string[] }
 	| { tag: typeof ToplevelTag.cls, span: number,
 		name: string, gs: string[], conss: Constructor[] }
 	| { tag: typeof ToplevelTag._let, span: number,
@@ -450,7 +453,12 @@ private toplevel(): Toplevel {
 	}
 
 	let span = this.i
-	if (this.tryWord("class")) {
+	if (this.tryWord("axiom")) {
+		let name = this.assertIdent()
+		let gs = this.generics()
+
+		return {tag: ToplevelTag.axiom, span, name, gs}
+	} else if (this.tryWord("class")) {
 		let name = this.assertIdent()
 		let gs = this.generics()
 

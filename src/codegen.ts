@@ -201,6 +201,7 @@ private codegen_(): ObjectMap<string> {
 		mapInsert(toplevels, "_", this.unshiftCode())
 		break
 	case ToplevelTag.infixdecl:
+	case ToplevelTag.axiom:
 		break
 	default:
 		nonExhaustiveMatch(item satisfies never)

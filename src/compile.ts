@@ -39,6 +39,8 @@ export class ItemCtx {
 	private getToplevelSymbols_(): string[] {
 		let item = this.item
 		switch (item.tag) {
+		case ToplevelTag.axiom:
+			return [item.name]
 		case ToplevelTag.cls: {
 			let symbol = item.name
 			let symbols = [symbol, symbol+"ᐅelim"]
