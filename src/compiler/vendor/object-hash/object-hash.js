@@ -1,4 +1,6 @@
 'use strict';
+// todo: remove "allowJs" from `tsconfig.json`
+// todo: optimise dispatch
 
 var crypto = require('crypto');
 
@@ -8,8 +10,8 @@ var crypto = require('crypto');
  * Options:
  *
  *  - `algorithm` hash algo to be used by this instance: *'sha1', 'md5'
- *  - `excludeValues` {true|*false} hash object keys, values ignored
  *  - `encoding` hash encoding, supports 'buffer', '*hex', 'binary', 'base64'
+ *  - `excludeValues` {true|*false} hash object keys, values ignored
  *  - `ignoreUnknown` {true|*false} ignore unknown object types
  *  - `replacer` optional function that replaces values before hashing
  *  - `respectFunctionProperties` {*true|false} consider function properties when hashing
@@ -18,6 +20,8 @@ var crypto = require('crypto');
  *    when hashing to distinguish between types
  *  - `unorderedArrays` {true|*false} Sort all arrays before hashing
  *  - `unorderedSets` {*true|false} Sort `Set` and `Map` instances before hashing
+ *  - `unorderedObjects` {*true|false} Sort object keys before hashing
+ *  - `excludeKeys` predicate. Skip a key-value pair if excludeKeys(key) is true
  *  * = default
  *
  * @param {object} object value to hash
@@ -65,15 +69,15 @@ function applyDefaults(object, sourceOptions){
 	var options = {};
 	options.algorithm = sourceOptions.algorithm || 'sha1';
 	options.encoding = sourceOptions.encoding || 'hex';
-	options.excludeValues = sourceOptions.excludeValues ? true : false;
 	options.algorithm = options.algorithm.toLowerCase();
 	options.encoding = options.encoding.toLowerCase();
+	options.excludeValues = sourceOptions.excludeValues ? true : false;
 	options.ignoreUnknown = sourceOptions.ignoreUnknown !== true ? false : true; // default to false
 	options.respectType = sourceOptions.respectType === false ? false : true; // default to true
 	options.respectFunctionNames = sourceOptions.respectFunctionNames === false ? false : true;
 	options.respectFunctionProperties = sourceOptions.respectFunctionProperties === false ? false : true;
 	options.unorderedArrays = sourceOptions.unorderedArrays !== true ? false : true; // default to false
-	options.unorderedSets = sourceOptions.unorderedSets === false ? false : true; // default to false
+	options.unorderedSets = sourceOptions.unorderedSets === false ? false : true; // default to true
 	options.unorderedObjects = sourceOptions.unorderedObjects === false ? false : true; // default to true
 	options.replacer = sourceOptions.replacer || undefined;
 	options.excludeKeys = sourceOptions.excludeKeys || undefined;
