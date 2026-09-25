@@ -1,6 +1,6 @@
 import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any, unexpectedMatch, assertDefined } from './util.ts'
 
-import { InstrTag, showExpr, ToplevelTag, type Constructor, type Instr, type Toplevel, type TypeExpr } from './syntax.ts'
+import { InstrTag, mkSpan, showExpr, ToplevelTag, type Constructor, type Instr, type Span, type Toplevel, type TypeExpr } from './syntax.ts'
 import { CompileError, Compiler, ItemCtx } from './compile.ts'
 
 //! Implements typechecking using an algorithm from
@@ -88,6 +88,10 @@ private nextIns() {
 
 private stepIns() {
 	return this.arena()[this.k++]
+}
+
+private mkSpan(): Span {
+	return mkSpan(this.item, this.ins().span)
 }
 
 // invent a name like hint but not present in "taken"
@@ -456,7 +460,7 @@ private subtypeUi(ty1: Type, ty2: Type) {
 		this.subtype(ty1, ty2)
 	} catch (e) {
 		assert(!(e instanceof CompileError))
-		throw new CompileError(this.ins().span, this.log.join("\n"),
+		throw new CompileError(this.mkSpan(), this.log.join("\n"),
 			`error: \`${showType(ty1)}' is not a subtype of \`${showType(ty2)}'`,
 			{ cause: e })
 	}
@@ -616,7 +620,7 @@ private infer() {
 		return ty
 	} catch (e) {
 		if (e instanceof CompileError) throw e
-		throw new CompileError(this.ins().span, this.log.join("\n"), undefined, { cause: e })
+		throw new CompileError(this.mkSpan(), this.log.join("\n"), undefined, { cause: e })
 	}
 }
 
@@ -663,7 +667,7 @@ private check(ty: Type) {
 	}
 	} catch (e) {
 		if (e instanceof CompileError) throw e
-		throw new CompileError(this.ins().span, this.log.join("\n"), undefined, { cause: e })
+		throw new CompileError(this.mkSpan(), this.log.join("\n"), undefined, { cause: e })
 	}
 }
 

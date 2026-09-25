@@ -1,20 +1,36 @@
 import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
 import { any, type ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
 
-import { InstrTag, Syntax, ToplevelTag, type Toplevel } from './syntax.ts'
+import { InstrTag, Syntax, ToplevelTag, type InfixDecl, type Span, type Toplevel } from './syntax.ts'
 import { Huk, RootTyck } from './huk.ts'
 import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
 import { toposort } from './algorithms.ts'
 
-const std = await readFile("./src/test/std.meml.rs", { encoding:"utf-8" })
-
 export class CompileError extends Error {
-	constructor(public span: number, public log: string = "", message?: string,
+	constructor(public span: Span, public log: string = "", message?: string,
 		options?: ErrorOptions) {
 		super(message, options)
 	}
+}
+
+export type PackageSource = Module
+export type Module = ObjectMap<ModuleEntry>
+export type ModuleEntry =
+	| { tag: "file", text: string }
+	| { tag: "directory", entries: Module }
+
+export async function packageSourceFromPaths(paths: string[]): Promise<PackageSource> {
+	let promises = <Promise<[string, ModuleEntry]>[]>paths.map(
+		async path => ([path, {
+				tag: "file",
+				text: await readFile(path, { encoding:"utf-8" })
+			}])
+	)
+	let files = await Promise.all(promises)
+	return Object.fromEntries(files)
 }
 
 export class ItemCtx {
@@ -23,7 +39,8 @@ export class ItemCtx {
 	tyck: Huk
 	cg: ItemCodegen
 
-	constructor(private compiler: Compiler,
+	constructor(
+		private compiler: Compiler,
 		private rootTyck: RootTyck, cg: RootCodegen | null,
 		public network: Network, private item: Toplevel) {
 		this.tyck = new Huk(this.compiler, this, rootTyck, item)
@@ -127,7 +144,7 @@ export class ItemCtx {
 }
 
 export class Compiler {
-private src: string
+private filePathToText: ObjectMap<string> = Object.create(null)
 private logs: string[] = []
 private tyck: RootTyck = new RootTyck()
 private cg: RootCodegen = new RootCodegen()
@@ -138,9 +155,8 @@ itemCtxOfItemId: ArrayMap<ItemCtx> = []
 symbolToItemId: ObjectMap<number> = Object.create(null)
 
 constructor(
-	src: string,
+	private src: PackageSource,
 	private logging: boolean) {
-		this.src = std + src
 	}
 
 static makeItemNetwork() {
@@ -167,28 +183,33 @@ log(...xs: any[]) {
 private reportError(e: CompileError) {
 	if (this.logging) write(e.log)
 
+	let text = mapGet(this.filePathToText, e.span.filePath)
+	let offset = e.span.offset
+
 	let tabsize = 2
 	let tab = ' '.repeat(tabsize)
 
 	let lineNumber = 0
-	for (let i of range(e.span)) if (this.src[i] === "\n") lineNumber++
+	for (let i of range(offset)) if (text[i] === "\n") lineNumber++
 	let lineNumberString = lineNumber + " | "
 
 	// line begins after either line feed or -1
-	let lineStart = this.src.lastIndexOf("\n", e.span) + 1
-	let lineEnd = this.src.indexOf("\n", e.span)
-	if (lineEnd === -1) lineEnd = this.src.length
+	let lineStart = text.lastIndexOf("\n", offset) + 1
+	let lineEnd = text.indexOf("\n", offset)
+	if (lineEnd === -1) lineEnd = text.length
 
-	let unformattedLine = this.src.substring(lineStart, lineEnd)
+	let unformattedLine = text.substring(lineStart, lineEnd)
 	let formattedLine = unformattedLine.replaceAll('\t', tab)
 	formattedLine = `\n${lineNumberString}${formattedLine}`
 
 	// Count characters in line prefix. Tabs count for `tabsize` characters
-	let charOffset = e.span - lineStart
+	let charOffset = offset - lineStart
 	let cellOffset = 0
 	for (let x of unformattedLine.substring(0, charOffset))
 		cellOffset += x === '\t' ? tabsize : 1
-	let underline = ' '.repeat(lineNumberString.length + cellOffset) + "^"
+	let underLinePrefix = ' '.repeat(lineNumberString.length + cellOffset)
+	let fileCrumb = e.span.filePath
+	let underline = `${underLinePrefix}^ (${fileCrumb})`
 
 	write(`${formattedLine}
 ${underline}
@@ -198,7 +219,15 @@ Caused by:\n`)
 
 compile() {
 	try {
-		let items = [...new Syntax(this.src).syntax()]
+		let infixDecls: InfixDecl[] = []
+		let items: Toplevel[] = []
+		for (let [path, entry] of Object.entries(this.src)) {
+			if (entry.tag !== "file") error("todo: nested modules")
+			path = resolve(path)
+			let text = entry.text
+			mapInsert(this.filePathToText, path, text)
+			items.push(...new Syntax(infixDecls, path, text).syntax())
+		}
 
 		for (let item of items) {
 			let itemCtx = new ItemCtx(
