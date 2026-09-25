@@ -1,9 +1,7 @@
-import { readFile } from 'node:fs/promises'
-
-import { Compiler } from './compile.ts'
+import { Compiler, readPackageSourceFromFs, type PackageSource } from './compile.ts'
 import { write } from './util.ts'
 
-function test(src: string) {
+function test(src: PackageSource) {
 	let t = performance.now()
 	let obj = new Compiler(src, true).compile()
 
@@ -14,8 +12,9 @@ function test(src: string) {
 	console.log(performance.now()-t)
 }
 
-async function main() {
-	test(await readFile("./src/test/test.meml.rs", { encoding:"utf-8" }))
+async function main(): Promise<void> {
+	let src = await readPackageSourceFromFs("./src/test/")
+	test(src)
 }
 
 await main()

@@ -39,6 +39,12 @@ export type Constructor = { name: string, fields: Field[] }
 export type Annotation = { name: string, text: string }
 export type Binding = { name: string, type: TypeExpr }
 
+export type Span = { filePath: string, offset: number }
+
+export function mkSpan(item: Toplevel, offset: number): Span {
+	return { ...item.span, offset }
+}
+
 // A Toplevel is the syntactic part of an Item data structure
 export namespace ToplevelTag {
 	export const typeexpr = Symbol("type-expr")
@@ -50,19 +56,19 @@ export namespace ToplevelTag {
 }
 
 export type TypeExpr =
-	{ tag: typeof ToplevelTag.typeexpr, span: number, arena: Instr[] }
+	{ tag: typeof ToplevelTag.typeexpr, span: Span, arena: Instr[] }
 export type Toplevel =
 	| TypeExpr
-	| { tag: typeof ToplevelTag.axiom, span: number,
+	| { tag: typeof ToplevelTag.axiom, span: Span,
 		name: string, gs: string[] }
-	| { tag: typeof ToplevelTag.cls, span: number,
+	| { tag: typeof ToplevelTag.cls, span: Span,
 		name: string, gs: string[], conss: Constructor[] }
-	| { tag: typeof ToplevelTag._let, span: number,
+	| { tag: typeof ToplevelTag._let, span: Span,
 		name: string, retT: TypeExpr, arena: Instr[] }
-	| { tag: typeof ToplevelTag.fun, span: number,
+	| { tag: typeof ToplevelTag.fun, span: Span,
 		isMethod: boolean, name: string, gs: string[], bs: Binding[],
 		retT: TypeExpr, annots: Annotation[], arena: Instr[] }
-	| { tag: typeof ToplevelTag.infixdecl, span: number } & InfixDecl
+	| { tag: typeof ToplevelTag.infixdecl, span: Span } & InfixDecl
 
 export namespace InstrTag {
 	export const int = Symbol("int")
@@ -97,9 +103,17 @@ export type Instr =
 
 export class Syntax {
 private i: number = 0
-private infixDecls: InfixDecl[] = []
 
-constructor(private s: string) {}
+constructor(
+	// todo: import functionality for infix operators
+	private infixDecls: InfixDecl[],
+	private filePath: string,
+	private s: string
+) {}
+
+private mkSpan(offset: number): Span {
+	return { filePath: this.filePath, offset }
+}
 
 private notPastEof() {
 	return this.i < this.s.length
@@ -234,7 +248,7 @@ private stringLiteral(end: string) {
 
 private type(): TypeExpr {
 	return {tag: ToplevelTag.typeexpr,
-		span: this.i,
+		span: this.mkSpan(this.i),
 		arena: this.expr()
 	}
 }
@@ -457,7 +471,7 @@ private toplevel(): Toplevel {
 		let name = this.assertIdent()
 		let gs = this.generics()
 
-		return {tag: ToplevelTag.axiom, span, name, gs}
+		return {tag: ToplevelTag.axiom, span: this.mkSpan(span), name, gs}
 	} else if (this.tryWord("class")) {
 		let name = this.assertIdent()
 		let gs = this.generics()
@@ -480,14 +494,14 @@ private toplevel(): Toplevel {
 			conss.push({name, fields})
 		}
 
-		return {tag: ToplevelTag.cls, span, name, gs, conss}
+		return {tag: ToplevelTag.cls, span: this.mkSpan(span), name, gs, conss}
 	} else if (this.tryWord("let")) {
 		let name = this.assertIdent()
 		this.assertWord(":")
 		let retT = this.type()
 		this.assertWord("=")
 
-		return {tag: ToplevelTag._let, span, name, retT, arena: this.expr()}
+		return {tag: ToplevelTag._let, span: this.mkSpan(span), name, retT, arena: this.expr()}
 	} else if (this.tryWord("fun")) {
 		let isMethod = this.tryWord(".")
 		let name = this.assertIdent()
@@ -499,7 +513,7 @@ private toplevel(): Toplevel {
 		this.assertWord("=")
 
 		let arena = this.expr()
-		return {tag: ToplevelTag.fun, span, isMethod, name, gs, bs, retT, annots, arena}
+		return {tag: ToplevelTag.fun, span: this.mkSpan(span), isMethod, name, gs, bs, retT, annots, arena}
 	} else if (this.tryWord("infix")) {
 		let associativity = "none"
 		if (this.tryWord("left")) associativity = "left"
@@ -526,7 +540,7 @@ private toplevel(): Toplevel {
 		let infix: InfixDecl = {symbols, associativity, strength, isMethod, replacement}
 		this.infixDecls.push(infix)
 
-		return {tag: ToplevelTag.infixdecl, span, ...infix}
+		return {tag: ToplevelTag.infixdecl, span: this.mkSpan(span), ...infix}
 	}
 	else
 		error("expected toplevel")
@@ -540,7 +554,8 @@ private toplevel(): Toplevel {
 		yield this.toplevel()
 	}
 	} catch (e) {
-		throw new CompileError(this.i, undefined, undefined, { cause: e })
+		throw new CompileError(this.mkSpan(this.i), undefined, undefined,
+			{ cause: e })
 	}
 }
 }

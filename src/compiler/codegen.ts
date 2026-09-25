@@ -1,6 +1,6 @@
 import { nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap, any, unexpectedMatch, last, assertDefined, unSingleton } from './util.ts'
 
-import { InstrTag, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
+import { InstrTag, mkSpan, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
 import { CompileError, ItemCtx } from './compile.ts'
 import { RootTyck } from './huk.ts'
 
@@ -137,7 +137,7 @@ private _expr(): string {
 	}
 	} catch (e) {
 		if (e instanceof CompileError) throw e
-		throw new CompileError(this.ins().span, undefined, undefined, { cause: e })
+		throw new CompileError(mkSpan(this.item, this.ins().span), undefined, undefined, { cause: e })
 	}
 }
 

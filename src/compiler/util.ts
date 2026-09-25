@@ -301,7 +301,11 @@ export function every<A>(i: Iterable<A>, f: (_: A) => boolean) {
 	return true
 }
 
-export function* map<A, B>(i: Iterable<A>, f: (_: A) => B) {
+export function* chain<A>(...i: Iterable<A>[]): Iterable<A> {
+	for (let j of i) yield* j
+}
+
+export function* map<A, B>(i: Iterable<A>, f: (_: A) => B): Iterable<B> {
 	for (let x of i) yield f(x)
 }
 
