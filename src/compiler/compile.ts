@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises'
 
-import { any, type ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unexpectedMatch, unSingleton, write } from './util.ts'
+import { any, type ArrayMap, assert, error, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
 
-import { InstrTag, Syntax, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
+import { InstrTag, Syntax, ToplevelTag, type Toplevel } from './syntax.ts'
 import { Huk, RootTyck } from './huk.ts'
 import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
@@ -11,14 +11,9 @@ import { toposort } from './algorithms.ts'
 const std = await readFile("./src/test/std.meml.rs", { encoding:"utf-8" })
 
 export class CompileError extends Error {
-	log: string
-	span: number
-
-	constructor(span: number, log?: string, message?: string,
+	constructor(public span: number, public log: string = "", message?: string,
 		options?: ErrorOptions) {
 		super(message, options)
-		this.log = log ?? ""
-		this.span = span
 	}
 }
 
@@ -236,80 +231,4 @@ compile() {
 		throw e.cause
 	}
 }
-}
-
-function showExpr0(arena: Instr[], boxI: number[], builder: string[]) {
-	let ins = arena[boxI[0]]
-	boxI[0]++
-	switch (ins.tag) {
-	case InstrTag.strlit:
-		builder.push(`"${ins.data}"`)
-		break
-	case InstrTag.native:
-		builder.push(`native[|${ins.code}|]`)
-		break
-	case InstrTag.int:
-		builder.push(toString(ins.data))
-		break
-	case InstrTag.array:
-		builder.push("@[")
-		if (arena[boxI[0]].tag!==InstrTag.endarray)
-			showExpr0(arena, boxI, builder)
-		while (arena[boxI[0]].tag!==InstrTag.endarray) {
-			builder.push(" ")
-			showExpr0(arena, boxI, builder)
-		}
-		boxI[0]++
-		builder.push("]")
-		break
-	case InstrTag.any:
-		builder.push("@any")
-		break
-	case InstrTag.arrow:
-		builder.push("[")
-		if (arena[boxI[0]].tag!==InstrTag.endarrow)
-			showExpr0(arena, boxI, builder)
-		while (arena[boxI[0]].tag!==InstrTag.endarrow) {
-			builder.push(" ")
-			showExpr0(arena, boxI, builder)
-		}
-		boxI[0]++
-		builder.push("]")
-		showExpr0(arena, boxI, builder)
-		break
-	case InstrTag.use:
-		builder.push(ins.name)
-		break
-	case InstrTag.app:
-		showExpr0(arena, boxI, builder)
-		if (ins.metName !== null)
-			builder.push(".", ins.metName)
-		builder.push("(")
-		if (arena[boxI[0]].tag !== InstrTag.endapp)
-			showExpr0(arena, boxI, builder)
-		while (arena[boxI[0]].tag !== InstrTag.endapp) {
-			builder.push(" ")
-			showExpr0(arena, boxI, builder)
-		}
-		builder.push(")")
-		boxI[0]++
-		break
-	case InstrTag.lam:
-		builder.push("{ ", ins.ps.join(" "), ". ")
-		showExpr0(arena, boxI, builder)
-		builder.push(" }")
-		break
-	case InstrTag.endapp:
-	case InstrTag.endarrow:
-	case InstrTag.endarray:
-		unexpectedMatch(ins); break
-	default:
-		nonExhaustiveMatch(ins satisfies never)
-	}
-}
-
-export function showExpr(arena: Instr[], i: number) {
-	let builder: string[] = []
-	showExpr0(arena, [i], builder)
-	return builder.join("")
 }

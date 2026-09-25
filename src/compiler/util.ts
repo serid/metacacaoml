@@ -127,6 +127,13 @@ export function mapInsert<A>(o: ObjectMap<A>, key: string | number, value: A) {
 	o[key] = value
 }
 
+export function mapInsertIfNotPresent<A>(o: ObjectMap<A>, key: string | number, producer: () => A) {
+	assert(["string","number"].includes(typeof key))
+	let value = o[key]
+	if (value !== undefined) return value
+	return o[key] = producer()
+}
+
 export function mapGet<A>(o: ObjectMap<A>, key: string | number) {
 	let value = o[key]
 	assert(value !== undefined, "key not present: "+key)
@@ -358,14 +365,7 @@ export function makeFraction(x: number /*integer*/) {
 }
 
 export class LateInit<T> {
-	private value: T | null
-
-	constructor(value?: T) {
-		if (value === undefined)
-			this.value = null
-		else
-			this.value = value
-	}
+	constructor(private value: T | null = null) {}
 
 	isSet(): boolean {
 		return this.value !== null
@@ -390,11 +390,7 @@ export class LateInit<T> {
 }
 
 class Fuel {
-	x: number
-
-	constructor(x: number) {
-		this.x = x
-	}
+	constructor(private x: number) {}
 
 	step() {
 		if (--this.x === 0) error("all out of fuel")

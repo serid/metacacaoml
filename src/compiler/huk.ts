@@ -1,7 +1,7 @@
 import { error, assert, assertL, assertEq, nonExhaustiveMatch, mapInsert, nextLast, findUniqueIndex, map, filter, join, GeneratorFunction, type ObjectMap, mapGet, LateInit, prettyPrint, mapRemove, mapFilterMapProjection, first, zip, view, Dexterity, flipHands, range, write, every, exceptionCauses, any, unexpectedMatch, assertDefined } from './util.ts'
 
-import { InstrTag, ToplevelTag, type Constructor, type Instr, type Toplevel, type TypeExpr } from './syntax.ts'
-import { CompileError, Compiler, ItemCtx, showExpr } from './compile.ts'
+import { InstrTag, showExpr, ToplevelTag, type Constructor, type Instr, type Toplevel, type TypeExpr } from './syntax.ts'
+import { CompileError, Compiler, ItemCtx } from './compile.ts'
 
 //! Implements typechecking using an algorithm from
 //! https://arxiv.org/abs/1306.6032
