@@ -1,7 +1,7 @@
 {
 	"scripts": {
-		"main": "bun src/main.ts",
-		"test": "bun src/tes.ts",
+		"main": "bun src/compiler/main.ts",
+		"test": "bun src/compiler/tes.ts",
 		"check": "fish check.fish",
 		"lint": "deno lint"
 	},

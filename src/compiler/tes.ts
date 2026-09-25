@@ -15,7 +15,7 @@ function test(src: string) {
 }
 
 async function main() {
-	test(await readFile("./src/test.meml.rs", { encoding:"utf-8" }))
+	test(await readFile("./src/test/test.meml.rs", { encoding:"utf-8" }))
 }
 
 await main()
