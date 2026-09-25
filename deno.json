@@ -1,6 +1,9 @@
 {
 	"lint": {
-		"exclude": ["./doc/delcont.js"],
+		"exclude": [
+			"./doc/delcont.js",
+			"./src/compiler/vendor/"
+		],
 		"rules": {
 			"tags": ["recommended"],
 			"exclude":
