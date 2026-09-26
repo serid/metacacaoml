@@ -1,8 +1,8 @@
-import { nonExhaustiveMatch, join, setContains, mapInsert, type ObjectMap, any, unexpectedMatch, last, assertDefined, unSingleton } from './util.ts'
+import { any, assertDefined, join, last, mapInsert, nonExhaustiveMatch, setContains, unexpectedMatch, unSingleton, type ObjectMap } from './util.ts'
 
-import { InstrTag, mkSpan, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
 import { CompileError, ItemCtx } from './compile.ts'
 import { RootTyck } from './huk.ts'
+import { InstrTag, mkSpan, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
 
 export function mangle(path: string): string {
 	// hazard: unicode!!

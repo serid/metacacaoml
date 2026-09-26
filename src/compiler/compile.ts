@@ -2,12 +2,12 @@ import { basename, resolve } from 'node:path'
 
 import { any, type ArrayMap, assert, chain, error, map, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
 
-import { InstrTag, Syntax, ToplevelTag, type InfixDecl, type Span, type Toplevel } from './syntax.ts'
-import { Huk, RootTyck } from './huk.ts'
+import { toposort } from './algorithms.ts'
 import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
-import { toposort } from './algorithms.ts'
+import { Huk, RootTyck } from './huk.ts'
 import { foldDirectory } from './node-util.ts'
+import { type InfixDecl, InstrTag, type Span, Syntax, type Toplevel, ToplevelTag } from './syntax.ts'
 
 export class CompileError extends Error {
 	constructor(public span: Span, public log: string = "", message?: string,

@@ -1,6 +1,7 @@
+import { assert, assertDefined, assertEq, assertL, assertNonNull, error, every, fuel, last, makeFraction, nonExhaustiveMatch, range, toString, unexpectedMatch, unSingleton, view } from './util.ts'
+
 import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
-import { error, assert, assertL, fuel, range, last, makeFraction, every, unSingleton, assertDefined, assertEq, assertNonNull, view, toString, unexpectedMatch, nonExhaustiveMatch } from './util.ts'
 
 function isPrefix(s: string, i: number, w: string): boolean {
 	if (w.length > s.length - i) return false

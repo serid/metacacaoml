@@ -1,0 +1,9 @@
+{
+	"editor.rulers": [80],
+	"editor.wordWrap": "wordWrapColumn",
+	"editor.tabSize": 2,
+	"editor.insertSpaces": false,
+	"editor.codeActionsOnSave": {
+		"source.organizeImports": "always",
+	}
+}
