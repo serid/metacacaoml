@@ -123,7 +123,7 @@ export class ItemCtx {
 	}
 
 	// only used for fixture dependencies
-	ensureFixtureDependencies() {
+	ensureFixtureDependencies(): void {
 		this.tyck.tyck()
 		for (let symbol of this.tyck.getSymbolicDependencies())
 			this.compiler.itemCtxOfSymbol(symbol).addFixtures()
@@ -144,7 +144,7 @@ export class ItemCtx {
 		return null
 	}
 
-	addFixtures() {
+	addFixtures(): void {
 		this.network.memoizeWithResolver(
 			"add-fixtures", [], this.addFixtures_.bind(this))
 	}
@@ -166,7 +166,7 @@ constructor(
 	private logging: boolean) {
 	}
 
-static makeItemNetwork() {
+static makeItemNetwork(): Network {
 	return new Network([
 		"toplevel-symbols",
 		"codegen-item",
@@ -180,14 +180,14 @@ itemCtxOfSymbol(symbol: string): ItemCtx {
 	return this.itemCtxOfItemId[id]
 }
 
-log(...xs: any[]) {
+log(...xs: any[]): void {
 	if (!this.logging) return
 	write(...xs)
 	for (let x of xs) this.logs.push(toString(x), " ")
 	this.logs.push("\n\n")
 }
 
-private reportError(e: CompileError) {
+private reportError(e: CompileError): void {
 	if (this.logging) write(e.log)
 
 	let text = mapGet(this.filePathToText, e.span.filePath)
@@ -224,7 +224,7 @@ CompileError: ${e.message}
 Caused by:\n`)
 }
 
-compile() {
+compile(): string {
 	try {
 		let infixDecls: InfixDecl[] = []
 		let items: Toplevel[] = []

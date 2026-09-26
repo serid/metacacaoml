@@ -2,14 +2,14 @@ import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
 import { error, assert, assertL, fuel, range, last, makeFraction, every, unSingleton, assertDefined, assertEq, assertNonNull, view, toString, unexpectedMatch, nonExhaustiveMatch } from './util.ts'
 
-function isPrefix(s: string, i: number, w: string) {
+function isPrefix(s: string, i: number, w: string): boolean {
 	if (w.length > s.length - i) return false
 	for (let j = 0; j < w.length; j++)
-		if (s[i + j] != w[j]) return false
+		if (s[i + j] !== w[j]) return false
 	return true
 }
 
-function unsignalNaN(x: HyperReal, message: string) {
+function unsignalNaN(x: HyperReal, message: string): number {
 	if (x === signalingNan) error(message)
 	return x
 }
@@ -115,46 +115,46 @@ private mkSpan(offset: number): Span {
 	return { filePath: this.filePath, offset }
 }
 
-private notPastEof() {
+private notPastEof(): boolean {
 	return this.i < this.s.length
 }
 
-private checkInvariant() {
+private checkInvariant(): void {
 	assert(this.notPastEof(), "i out of bounds")
 }
 
-private peekWord(w: string) {
+private peekWord(w: string): boolean {
 	return isPrefix(this.s, this.i, w)
 }
 
-private tryWordNoWhitespace(w: string) {
+private tryWordNoWhitespace(w: string): boolean {
 	if (!this.peekWord(w)) return false
 	this.i += w.length
 	return true
 }
 
-private tryWord(w: string) {
+private tryWord(w: string): boolean {
 	let b = this.tryWordNoWhitespace(w)
 	if (!b) return false
 	this.tryWhitespace()
 	return true
 }
 
-private assertWord(w: string) {
+private assertWord(w: string): void {
 	assertL(this.tryWord(w), () => `expected "${w}"`)
 }
 
-private peekChar() {
+private peekChar(): string {
 	this.checkInvariant()
 	return this.s[this.i]
 }
 
-private char() {
+private char(): string {
 	this.checkInvariant()
 	return this.s[this.i++]
 }
 
-private tryComment() {
+private tryComment(): void {
 	while (true) {
 	if (this.tryWord("#{")) {
 		while (this.notPastEof() && this.peekChar() !== '}') {
@@ -171,7 +171,7 @@ private tryComment() {
 	}
 }
 
-private tryWhitespace() {
+private tryWhitespace(): void {
 	while (this.notPastEof()) {
 		this.tryComment()
 		if (/\s/.test(this.peekChar())) {
@@ -182,7 +182,7 @@ private tryWhitespace() {
 	}
 }
 
-private uintNoWhiteSpace() {
+private uintNoWhiteSpace(): number | null {
 	if (!/[0-9]/.test(this.peekChar())) return null
 	let n = 0
 	do {
@@ -192,7 +192,7 @@ private uintNoWhiteSpace() {
 	return n
 }
 
-private uint() {
+private uint(): number | null {
 	let n = this.uintNoWhiteSpace()
 	this.tryWhitespace()
 	return n
@@ -226,7 +226,7 @@ private charactersWhile(r: RegExp): string {
 	return s
 }
 
-private ident() {
+private ident(): string | null {
 	if (!this.notPastEof() ||
 		!identAnlautRule.test(this.peekChar()))
 		return null
@@ -234,11 +234,11 @@ private ident() {
 	return mangle(id)
 }
 
-private assertIdent() {
+private assertIdent(): string {
 	return assertNonNull(this.ident(), "expected ident")
 }
 
-private stringLiteral(end: string) {
+private stringLiteral(end: string): string {
 	let s = ""
 	while (!this.tryWordNoWhitespace(end))
 		s += this.char()
@@ -253,14 +253,14 @@ private type(): TypeExpr {
 	}
 }
 
-private idents(end: string) {
+private idents(end: string): string[] {
 	let ns = []
 	while (!this.tryWord(end))
 		ns.push(this.assertIdent())
 	return ns
 }
 
-private generics() {
+private generics(): string[] {
 	let gs = []
 	while (this.tryWord("'")) {
 		gs.push(this.assertIdent())
@@ -284,7 +284,7 @@ private bindings(): Binding[] {
 	return bs
 }
 
-private lambda(outInss: Instr[]) {
+private lambda(outInss: Instr[]): void {
 	// assumption: this.notPastEof() && "λ{".includes(this.peekChar())
 	let span = this.i
 	let isEmbraced = this.char() === "{"
@@ -385,7 +385,7 @@ private exprNoInfix(): Instr[] {
 }
 
 private static shuntingYardSpill(outputStack: Instr[][],
-	operatorStack: {span:number, decl:InfixDecl}[]) {
+	operatorStack: {span:number, decl:InfixDecl}[]): void {
 	let op = assertDefined(operatorStack.pop())
 	let right = assertDefined(outputStack.pop())
 	let left = assertDefined(outputStack.pop())
@@ -546,7 +546,7 @@ private toplevel(): Toplevel {
 		error("expected toplevel")
 }
 
-*syntax() {
+*syntax(): Iterable<Toplevel> {
 	try {
 	this.tryWhitespace()
 	while (this.notPastEof()) {
@@ -560,7 +560,7 @@ private toplevel(): Toplevel {
 }
 }
 
-function showExpr0(arena: Instr[], boxI: [number], builder: string[]) {
+function showExpr0(arena: Instr[], boxI: [number], builder: string[]): void {
 	let ins = arena[boxI[0]]
 	boxI[0]++
 	switch (ins.tag) {
@@ -630,7 +630,7 @@ function showExpr0(arena: Instr[], boxI: [number], builder: string[]) {
 	}
 }
 
-export function showExpr(arena: Instr[], i: number) {
+export function showExpr(arena: Instr[], i: number): string {
 	let builder: string[] = []
 	showExpr0(arena, [i], builder)
 	return builder.join("")

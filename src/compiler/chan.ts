@@ -1,6 +1,6 @@
 import { assert } from './util.ts'
 
-export function spawn(f: () => void) {
+export function spawn(f: () => void): void {
 	setTimeout(f)
 }
 
@@ -22,17 +22,17 @@ export class Condition<A> {
 		this.settled = false
 	}
 
-	fulfill(x: A) {
+	fulfill(x: A): void {
 		this.settled = true
 		this.f(x)
 	}
 
-	retract(x: any) {
+	retract(x: any): void {
 		this.settled = true
 		this.r(x)
 	}
 
-	then(a: (_: A) => any, b: (_: any) => any) {
+	then(a: (_: A) => any, b: (_: any) => any): Promise<any> {
 		return this.v.then(a, b)
 	}
 }
@@ -46,7 +46,7 @@ export class Mutex {
 		this.locked = false
 	}
 
-	async lock() {
+	async lock(): Promise<void> {
 		if (!this.locked) {
 			this.locked = true
 			return
@@ -56,7 +56,7 @@ export class Mutex {
 		await condition
 	}
 
-	unlock() {
+	unlock(): void {
 		assert(this.locked)
 		if (this.queue.length === 0) {
 			this.locked = false
@@ -76,14 +76,14 @@ export class Spsc<A> {
 		this.writeBarrier = new Condition()
 	}
 
-	async send(x: A) {
+	async send(x: A): Promise<void> {
 		assert(!this.readBarrier.settled)
 		this.readBarrier.fulfill(x)
 		await this.writeBarrier
 		this.writeBarrier = new Condition()
 	}
 
-	async recv() {
+	async recv(): Promise<A> {
 		let x = await this.readBarrier
 		// failing this assertion implies there were multiple concurrent reads
 		assert(this.readBarrier.settled, "concurrent recv")
@@ -103,17 +103,17 @@ export class Tunguska<A> {
 		this.stack = []
 	}
 
-	unshift(x: A) {
+	unshift(x: A): void {
 		this.stack.push(x)
 	}
 
-	async recv() {
+	async recv(): Promise<A> {
 		if (this.stack.length <= 0)
 			return await this.v.recv()
-		return this.stack.pop()
+		return this.stack.pop()!
 	}
 
-	async peek() {
+	async peek(): Promise<A> {
 		if (this.stack.length <= 0)
 			this.unshift(await this.v.recv())
 		return this.stack[this.stack.length-1]

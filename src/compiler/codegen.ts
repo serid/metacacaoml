@@ -4,7 +4,7 @@ import { InstrTag, mkSpan, ToplevelTag, type Instr, type Toplevel } from './synt
 import { CompileError, ItemCtx } from './compile.ts'
 import { RootTyck } from './huk.ts'
 
-export function mangle(path: string) {
+export function mangle(path: string): string {
 	// hazard: unicode!!
 	// characters found using shapecatcher.com
 	path = path.replaceAll("/", "ᐅ")
@@ -30,33 +30,33 @@ private arena(): Instr[] {
 	return any(this.item).arena
 }
 
-private ins() {
+private ins(): Instr {
 	return this.arena()[Math.max(this.k-1, 0)]
 }
 
-private nextIns() {
+private nextIns(): Instr {
 	return this.arena()[this.k]
 }
 
-private stepIns() {
+private stepIns(): Instr {
 	return this.arena()[this.k++]
 }
 
-private alloc() {
+private alloc(): string {
 	return "_" + this.nextVar++
 }
 
-private unshiftCode() {
+private unshiftCode(): string {
 	let out = unSingleton(this.code).join("")
 	this.code = [[]]
 	return out
 }
 
-private pushCode(s: string) {
+private pushCode(s: string): void {
 	last(this.code).push(s)
 }
 
-private emitSsa(e: string) {
+private emitSsa(e: string): string {
 	let ix = this.alloc()
 	this.pushCode(`  const ${ix} = ${e}\n`)
 	return ix
@@ -225,7 +225,7 @@ export class RootCodegen {
 		`const _fixtures_ = Object.create(null)\n`
 	]
 
-	addToplevels(cgs: ObjectMap<string>) {
+	addToplevels(cgs: ObjectMap<string>): void {
 		let toplevels = Object.entries(cgs).flatMap(
 			([symbol, code]) => ["_fixtures_.", symbol, " = ", code, "\n"])
 		this.code.push(...toplevels)

@@ -6,6 +6,21 @@
 		],
 		"rules": {
 			"tags": ["recommended"],
+			"include":
+			["no-node-globals"
+			, "camelcase"
+			, "eqeqeq"
+			, "explicit-function-return-type"
+			, "no-non-null-asserted-optional-chain"
+			, "no-process-global"
+			, "no-self-compare"
+			, "no-sparse-arrays"
+			, "no-sync-fn-in-async-fn"
+			, "no-throw-literal"
+			, "no-undef"
+			, "no-useless-rename"
+			, "single-var-declarator"
+			],
 			"exclude":
 				["no-explicit-any"
 				, "prefer-const"

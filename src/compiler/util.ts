@@ -6,15 +6,15 @@ export function error(e?: string): never {
 	throw new Error(e)
 }
 
-export function assert(b: boolean, e?: string) {
+export function assert(b: boolean, e?: string): void {
 	if (!b) error(e)
 }
 
-export function assertL(b: boolean, le: () => string) {
+export function assertL(b: boolean, le: () => string): void {
 	if (!b) error(le())
 }
 
-export function assertEq(x: any, y: any) {
+export function assertEq<A>(x: A, y: A): A {
 	assertL(deepEqual(x, y), () =>
 		`found ${prettyPrint(x)}, expected ${prettyPrint(y)}`)
 	return x
@@ -35,12 +35,12 @@ export function todo(msg?: string): never {
 	error(msg === undefined ? "unimplemented" : "todo: " + msg)
 }
 
-export function typeof2(o: any) {
+export function typeof2(o: any): string {
 	if (Array.isArray(o)) return "array"
 	return typeof o
 }
 
-export function* range(a: number, b?: number, step = 1) {
+export function* range(a: number, b?: number, step = 1): Iterable<number> {
 	if (b===undefined) {
 		b = a
 		a = 0
@@ -49,7 +49,7 @@ export function* range(a: number, b?: number, step = 1) {
 		yield i
 }
 
-export function prettyPrint(o: any) {
+export function prettyPrint(o: any): string {
 	if (typeof o === "string")
 		return '"' + o + '"'
 	return toString(o)
@@ -78,11 +78,11 @@ export function toString(o: any): string {
 	return o.toString()
 }
 
-export function write(...os: any[]) {
+export function write(...os: any[]): void {
 	console.log(os.map(toString).join(" "))
 }
 
-export function dbg(o: any) {
+export function dbg<A>(o: A): A {
 	write(o)
 	return o
 }
@@ -96,17 +96,15 @@ export function nonExhaustiveMatch(o: any): never {
 }
 
 
-export function deepEqual(x: any, y: any) {
+export function deepEqual<A>(x: A, y: A): boolean {
 	if (x === y) return true
-
-	assertL(typeof2(x) === typeof2(y), () =>
-		`found ${prettyPrint(x)}, expected ${prettyPrint(y)}`)
+	if (typeof2(x) !== typeof2(y)) return false
 
 	switch (true) {
 	case Array.isArray(x):
-		if (x.length !== y.length) return false
+		if (x.length !== any(y).length) return false
 		for (let i of indices(x))
-			if (!deepEqual(x[i], y[i])) return false
+			if (!deepEqual(x[i], any(y)[i])) return false
 		return true
 	default:
 		return false
@@ -121,26 +119,28 @@ export function mapNew<A>(props?: object): ObjectMap<A> {
 	return props !== undefined ? Object.setPrototypeOf(props, null) : Object.create(null)
 }
 
-export function mapInsert<A>(o: ObjectMap<A>, key: string | number, value: A) {
+export function mapInsert<A>(
+		o: ObjectMap<A>, key: string | number, value: A): void {
 	assert(["string","number"].includes(typeof key))
 	assert(o[key] === undefined, "key already present: "+key)
 	o[key] = value
 }
 
-export function mapInsertIfNotPresent<A>(o: ObjectMap<A>, key: string | number, producer: () => A) {
+export function mapInsertIfNotPresent<A>(
+		o: ObjectMap<A>, key: string | number, producer: () => A): A {
 	assert(["string","number"].includes(typeof key))
 	let value = o[key]
 	if (value !== undefined) return value
 	return o[key] = producer()
 }
 
-export function mapGet<A>(o: ObjectMap<A>, key: string | number) {
+export function mapGet<A>(o: ObjectMap<A>, key: string | number): A {
 	let value = o[key]
 	assert(value !== undefined, "key not present: "+key)
 	return value
 }
 
-export function mapRemove<A>(o: ObjectMap<A>, key: string | number) {
+export function mapRemove<A>(o: ObjectMap<A>, key: string | number): void {
 	assert(o[key] !== undefined, "key not present: "+key)
 	delete o[key]
 }
@@ -149,21 +149,21 @@ export function mapRemove<A>(o: ObjectMap<A>, key: string | number) {
 // values filtered and transformed by f
 export function mapFilterMapProjection<A, B>(o: ObjectMap<A>, f: (name: string, code: A) => B | null): ObjectMap<B> {
 	return <any>(new Proxy(o, {
-		get(target, key: string, _receiver) {
+		get(target, key: string, _receiver): B | undefined {
 			let value = Reflect.get(target, key)
 			if (value === undefined) return undefined
 			let out = f(key, value)
-			assert(out !== null, key + " is nullish")
+			if (out === null) error(key + " is nullish")
 			return out
 		},
 
-		ownKeys(target) {
+		ownKeys(target): string[] {
 			return [...filterMap(Object.entries(target), ([k,v])=>f(k,v)===null?null:k)]
 		}
 	}))
 }
 
-export function mapMap<A, B>(o: ObjectMap<A>, f: (_: A) => B) {
+export function mapMap<A, B>(o: ObjectMap<A>, f: (_: A) => B): ObjectMap<B> {
 	let out: ObjectMap<B> = Object.create(null)
 	for (let k in o) {
 		out[k] = f(o[k])
@@ -173,12 +173,12 @@ export function mapMap<A, B>(o: ObjectMap<A>, f: (_: A) => B) {
 
 export interface ObjectSet{ [k: string]: any | undefined }
 
-export function setContains(o: ObjectSet, key: string) {
+export function setContains(o: ObjectSet, key: string): boolean {
 	return o[key] !== undefined
 }
 
 export enum Dexterity {	Left, Right }
-export function flipHands(dex: Dexterity) {
+export function flipHands(dex: Dexterity): Dexterity {
 	return dex === Dexterity.Left ? Dexterity.Right : Dexterity.Left
 }
 
@@ -189,11 +189,11 @@ export class Pakulikha<A> {
 	constructor() {
 		this.q = null
 	}
-	send(x: A) {
+	send(x: A): void {
 		assert(this.q === null)
 		this.q = x
 	}
-	*recv() {
+	*recv(): Generator<undefined, A | null, unknown> {
 		if (this.q === null) yield
 		let ret = this.q
 		this.q = null
@@ -201,15 +201,15 @@ export class Pakulikha<A> {
 	}
 }
 
-export function nextLast<A, Next>(
-	g: Generator<A, any, Next>, ...value: [] | [Next]) {
+export function nextLast<A, TReturn, Next>(
+	g: Generator<A, TReturn, Next>, ...value: [] | [Next]): TReturn {
 	let iteratorResult = g.next(...value)
 	if (!iteratorResult.done) error("expected last")
 	return iteratorResult.value
 }
 
 export function getOne<A, Next>(
-	g: Generator<A, any, any>, ...value: [] | [Next]) {
+	g: Generator<A, any, any>, ...value: [] | [Next]): A {
 	let iteratorResult = g.next(...value)
 	if (iteratorResult.done) error("expected not last")
 	return iteratorResult.value
@@ -222,17 +222,17 @@ export function unSingleton<A>(xs: A[]): A {
 	return xs[0]
 }
 
-export function first<A>(xs: ArrayLike<A>) {
+export function first<A>(xs: ArrayLike<A>): A {
 	assert(xs.length > 0, "array is empty")
 	return xs[0]
 }
 
-export function last<A>(xs: ArrayLike<A>) {
+export function last<A>(xs: ArrayLike<A>): A {
 	assert(xs.length > 0, "array is empty")
 	return xs[xs.length-1]
 }
 
-export function indices<A>(xs: A[]) {
+export function indices<A>(xs: A[]): Iterable<number> {
 	return range(xs.length)
 }
 
@@ -266,17 +266,8 @@ export function mkArray<A>(length: number, x: A): A[] {
 	return Array(length).fill(x)
 }
 
-// array to iterator
-export function* makeIt<A>(xs: Iterable<A>) {
-	for (let x of xs) yield x
-}
-
-// ensures argument is an iterator
-export function it(xs: any): Generator<any, void, any> {
-	return "next" in xs ? xs : makeIt(xs)
-}
-
-export function findUniqueIndex<A>(xs: A[], f: (_: A) => boolean, from = 0) {
+export function findUniqueIndex<A>(
+		xs: A[], f: (_: A) => boolean, from = 0): number {
 	let ri = -1
 	for (let [i, x] of enumerateArray(xs, from))
 		if (f(x)) {
@@ -290,13 +281,13 @@ export function findUniqueIndex<A>(xs: A[], f: (_: A) => boolean, from = 0) {
 	return ri
 }
 
-export function indexOf<A>(i: Iterable<A>, x: A) {
+export function indexOf<A>(i: Iterable<A>, x: A): number {
 	for (let [ix, y] of enumerate(i))
 		if (y === x) return ix
 	return -1
 }
 
-export function every<A>(i: Iterable<A>, f: (_: A) => boolean) {
+export function every<A>(i: Iterable<A>, f: (_: A) => boolean): boolean {
 	for (let x of i) if (!f(x)) return false
 	return true
 }
@@ -309,18 +300,19 @@ export function* map<A, B>(i: Iterable<A>, f: (_: A) => B): Iterable<B> {
 	for (let x of i) yield f(x)
 }
 
-export function* filter<A>(i: Iterable<A>, f: (_: A) => boolean) {
+export function* filter<A>(i: Iterable<A>, f: (_: A) => boolean): Iterable<A> {
 	for (let x of i) if (f(x)) yield x
 }
 
-export function* filterMap<A, B>(i: Iterable<A>, f: (_: A) => B | null) {
+export function* filterMap<A, B>(
+		i: Iterable<A>, f: (_: A) => B | null): Iterable<B> {
 	for (let x of i) {
 		let y = f(x)
 		if (y !== null) yield y
 	}
 }
 
-export function foldl<A, B>(i: Iterable<B>, s: A, c: (_: A, _0: B) => A) {
+export function foldl<A, B>(i: Iterable<B>, s: A, c: (_: A, _0: B) => A): A {
 	for (let x of i) s = c(s, x)
 	return s
 }
@@ -339,15 +331,6 @@ export function join(i: Iterable<string>, sep=", "): string {
 }
 */
 
-export function forEach<A>(i: Iterable<A>, f: (_: A) => void) {
-	for (let x of i) f(x)
-}
-
-export function* bind(i: any, k: any) {
-	for (let x of i)
-		for (let y of k(x)) yield y
-}
-
 
 export function* exceptionCauses(e: Error): Generator<Error, void, void> {
 	yield e
@@ -361,7 +344,7 @@ export function* exceptionCauses(e: Error): Generator<Error, void, void> {
 }
 
 // 12345 -> 0.12345
-export function makeFraction(x: number /*integer*/) {
+export function makeFraction(x: number /*integer*/): number {
 	if (x === 0) return 0.0
 	let numDigits = Math.floor(Math.log10(x)) + 1
 	let scaled = Math.pow(10, numDigits)
@@ -381,13 +364,13 @@ export class LateInit<T> {
 		return this.value
 	}
 
-	set(value: T) {
+	set(value: T): void {
 		if (this.value !== null)
 			error("value already set")
 		this.value = value
 	}
 
-	setIfUnsetThen(value: ()=>T) {
+	setIfUnsetThen(value: ()=>T): void {
 		if (this.value===null)
 			this.value = value()
 	}
@@ -396,7 +379,7 @@ export class LateInit<T> {
 class Fuel {
 	constructor(private x: number) {}
 
-	step() {
+	step(): void {
 		if (--this.x === 0) error("all out of fuel")
 	}
 }
@@ -404,4 +387,5 @@ class Fuel {
 export let fuel = new Fuel(1000)
 
 // great stuff right here
-export const GeneratorFunction: any = function* () {}.constructor
+export const GeneratorFunction: any =
+	function* (): Iterable<never> {}.constructor

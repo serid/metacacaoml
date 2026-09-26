@@ -1,7 +1,7 @@
 import { Compiler, readPackageSourceFromFs, type PackageSource } from './compile.ts'
 import { write } from './util.ts'
 
-function test(src: PackageSource) {
+function test(src: PackageSource): void {
 	let t = performance.now()
 	let obj = new Compiler(src, true).compile()
 

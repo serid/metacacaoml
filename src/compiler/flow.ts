@@ -2,7 +2,7 @@
 
 import { mapGet, type ObjectMap } from './util.ts'
 
-function argsToString(args: string[]) {
+function argsToString(args: string[]): string {
 	return args.join(":")
 }
 
@@ -36,7 +36,7 @@ export class Network {
 		return this.memoizeWithResolver(path, args, (_, ...args) => duct(...args))
 	}
 
-	resetCache() {
+	resetCache(): void {
 		for (let path of this.paths) this.cache[path] = Object.create(null)
 	}
 }
