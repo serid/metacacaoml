@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 
 import objectHash from './vendor/object-hash/object-hash.js'
 
-import { dbg, mapGet, type ObjectMap } from './util.ts'
+import { mapGet, write, type ObjectMap } from './util.ts'
 
 export type BinaryString = string
 export type Digest = BinaryString
@@ -24,7 +24,7 @@ export function binaryStringToBase64(bs: BinaryString): string {
 export function digest(o: any): BinaryString {
 	// todo: restructure object-hash to store options, not construct and apply every time
 	let buf = objectHash(o, { algorithm: "SHA256", encoding: "buffer" })
-	return dbg(bufferToBinaryString(buf))
+	return bufferToBinaryString(buf)
 	// also consider xxHash since I don't need cryptographic resilience, merely
 	// very very good uniformity
 }
@@ -51,7 +51,10 @@ export class QueryCache {
 		let row = mapGet(this.cache, query)
 		let key = digest(args)
 		let value = row[key]
-		if (value !== undefined) return value
+		if (value !== undefined) {
+			write(`cache hit: ${key}`)
+			return value
+		}
 
 		return row[key] = f(this, ...args)
 	}

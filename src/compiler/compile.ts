@@ -57,64 +57,8 @@ export class ItemCtx {
 		private compiler: Compiler,
 		private rootTyck: RootTyck, cg: RootCodegen | null,
 		public network: Network, private item: Toplevel) {
-		this.tyck = new Huk(this.compiler, this, rootTyck, item)
-		this.cg = new ItemCodegen(this, cg, rootTyck, item)
-	}
-
-	// symbols introduced by this item
-	private getToplevelSymbols_(): string[] {
-		let item = this.item
-		switch (item.tag) {
-		case ToplevelTag.axiom:
-			return [item.name]
-		case ToplevelTag.cls: {
-			let symbol = item.name
-			let symbols = [symbol, symbol+"ᐅelim"]
-			for (let cons of item.conss)
-				symbols.push(symbol+"ᐅ"+cons.name)
-			return symbols
-		}
-		case ToplevelTag._let:
-			return [item.name]
-		case ToplevelTag.fun: {
-			if (!item.isMethod)
-				return [item.name]
-			assert(item.bs.length >= 1, "methods shall have at least one parameter")
-
-			let annotation = item.bs[0].type.arena
-			let className: string
-			switch (annotation[0].tag) {
-				case InstrTag.use:
-					className = annotation[0].name
-					break
-				case InstrTag.app:
-					assert(annotation[1].tag===InstrTag.use,
-						"1st parameter of a method shall be a class")
-					className = any(annotation[1]).name
-					break
-				default:
-					error("1st parameter of a method shall be a class")
-			}
-			return [className + "ᐅ" + item.name]
-		}
-		case ToplevelTag.typeexpr:
-			error("type expression cannot have toplevel symbols")
-			break // to please the linter
-		case ToplevelTag.infixdecl:
-			return []
-		default:
-			nonExhaustiveMatch(item satisfies never)
-		}
-
-	}
-
-	getToplevelSymbols(): string[] {
-		return this.network.memoize("toplevel-symbols", [],
-			this.getToplevelSymbols_.bind(this))
-	}
-
-	getToplevelSymbol(): string {
-		return unSingleton(this.getToplevelSymbols())
+		this.tyck = new Huk(compiler.qc, compiler, this, rootTyck, item)
+		this.cg = new ItemCodegen(compiler.qc, this, cg, rootTyck, item)
 	}
 
 	// jit compile and close the code with a _fixtures_ object
@@ -161,7 +105,7 @@ export class Compiler {
 private logs: string[] = []
 private tyck: RootTyck = new RootTyck()
 private cg: RootCodegen = new RootCodegen()
-private qc: QueryCache
+public qc: QueryCache
 private pathToFileDigest: ObjectMap<Digest> = Object.create(null)
 private packageNameToPath: ObjectMap<string> = Object.create(null)
 
@@ -196,6 +140,7 @@ constructor(
 		this.qc = new QueryCache([
 				"preparse",
 				"parse",
+				"get-toplevel-symbols",
 			],
 			files
 		)
@@ -301,7 +246,7 @@ compile(): string {
 		for (let item of items) {
 			let itemCtx = new ItemCtx(
 				this, this.tyck, this.cg, Compiler.makeItemNetwork(), item)
-			for (let symbol of itemCtx.getToplevelSymbols())
+			for (let symbol of getToplevelSymbols(this.qc, item))
 				mapInsert(this.symbolToItemId, symbol, this.itemCtxOfItemId.length)
 			this.itemCtxOfItemId.push(itemCtx)
 		}
@@ -329,4 +274,61 @@ compile(): string {
 		else throw e
 	}
 }
+}
+
+// Symbols introduced by an item
+function getToplevelSymbols0(_qc: QueryCache, item: Toplevel): string[] {
+	switch (item.tag) {
+	case ToplevelTag.axiom:
+		return [item.name]
+	case ToplevelTag.cls: {
+		let symbol = item.name
+		let symbols = [symbol, symbol+"ᐅelim"]
+		for (let cons of item.conss)
+			symbols.push(symbol+"ᐅ"+cons.name)
+		return symbols
+	}
+	case ToplevelTag._let:
+		return [item.name]
+	case ToplevelTag.fun: {
+		if (!item.isMethod)
+			return [item.name]
+		assert(item.bs.length >= 1, "methods shall have at least one parameter")
+
+		let annotation = item.bs[0].type.arena
+		let className: string
+		switch (annotation[0].tag) {
+			case InstrTag.use:
+				className = annotation[0].name
+				break
+			case InstrTag.app:
+				assert(annotation[1].tag===InstrTag.use,
+					"1st parameter of a method shall be a class")
+				className = any(annotation[1]).name
+				break
+			default:
+				error("1st parameter of a method shall be a class")
+		}
+		return [className + "ᐅ" + item.name]
+	}
+	case ToplevelTag.typeexpr:
+		error("type expression cannot have toplevel symbols")
+		break // to please the linter
+	case ToplevelTag.infixdecl:
+		return []
+	default:
+		nonExhaustiveMatch(item satisfies never)
+	}
+}
+
+// todo: memoize
+export function getToplevelSymbols(qc: QueryCache, item: Toplevel): string[] {
+	return getToplevelSymbols0(qc, item)
+
+	// Digest computation is abysmally slow. Figure out how to replace large objects with CAS, then reenable.
+	// return qc.getOrCompute("get-toplevel-symbols", [item], getToplevelSymbols0)
+}
+
+export function getToplevelSymbol(qc: QueryCache, item: Toplevel): string {
+	return unSingleton(getToplevelSymbols(qc, item))
 }

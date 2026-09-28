@@ -1,7 +1,8 @@
 import { any, assertDefined, join, last, mapInsert, nonExhaustiveMatch, setContains, unexpectedMatch, unSingleton, type ObjectMap } from './util.ts'
 
-import { CompileError, ItemCtx } from './compile.ts'
+import { CompileError, getToplevelSymbol, ItemCtx } from './compile.ts'
 import { RootTyck } from './huk.ts'
+import type { QueryCache } from './query-cache.ts'
 import { InstrTag, mkSpan, ToplevelTag, type Instr, type Toplevel } from './syntax.ts'
 
 export function mangle(path: string): string {
@@ -21,6 +22,7 @@ private nextVar: number = 0
 private code: string[][] = [[]]
 
 constructor(
+	private qc: QueryCache,
 	private itemCtx: ItemCtx,
 	private root: RootCodegen | null, // toplevel codegen
 	private rootTyck: RootTyck, // toplevel tyck
@@ -193,7 +195,7 @@ private codegen_(): ObjectMap<string> {
 		let retIx2 = this.expr()
 
 		this.pushCode(`  return ${retIx2}\n})`)
-		mapInsert(toplevels, this.itemCtx.getToplevelSymbol(), this.unshiftCode())
+		mapInsert(toplevels, getToplevelSymbol(this.qc, this.item), this.unshiftCode())
 		break
 	}
 	case ToplevelTag.typeexpr:
