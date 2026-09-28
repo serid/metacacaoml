@@ -1,13 +1,14 @@
-import { basename, resolve } from 'node:path'
+import { basename, join } from 'node:path'
 
-import { any, type ArrayMap, assert, chain, error, map, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unSingleton, write } from './util.ts'
+import { any, type ArrayMap, assert, chain, error, map, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unexpectedMatch, unSingleton, write } from './util.ts'
 
-import { toposort } from './algorithms.ts'
+import { toposort, toposortAcyclic } from './algorithms.ts'
 import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
 import { Huk, RootTyck } from './huk.ts'
 import { foldDirectory } from './node-util.ts'
-import { type InfixDecl, InstrTag, type Span, Syntax, type Toplevel, ToplevelTag } from './syntax.ts'
+import { type Digest, digest, QueryCache } from './query-cache.ts'
+import { type InfixDecl, InstrTag, preparse, type PreparseResult, type Span, Syntax, type Toplevel, ToplevelTag } from './syntax.ts'
 
 export class CompileError extends Error {
 	constructor(public span: Span, public log: string = "", message?: string,
@@ -16,7 +17,7 @@ export class CompileError extends Error {
 	}
 }
 
-export type PackageSource = { name: string, content: Module }
+export type PackageSource = { path: string, name: string, content: Module }
 export type Module = ObjectMap<ModuleEntry>
 export type ModuleEntry =
 	| { tag: "file", path: string, text: string }
@@ -37,7 +38,13 @@ export async function readPackageSourceFromFs(dirPath: string): Promise<PackageS
 		}])
 		return Object.fromEntries(chain(files1, directories1))
 	})
-	return { name, content }
+	return { path: dirPath, name, content }
+}
+
+function resolveModPath(
+		packageNameToPath: ObjectMap<string>, pkgName: string, modPath: string
+		): string {
+	return join(mapGet(packageNameToPath, pkgName), modPath)
 }
 
 export class ItemCtx {
@@ -151,10 +158,12 @@ export class ItemCtx {
 }
 
 export class Compiler {
-private filePathToText: ObjectMap<string> = Object.create(null)
 private logs: string[] = []
 private tyck: RootTyck = new RootTyck()
 private cg: RootCodegen = new RootCodegen()
+private qc: QueryCache
+private pathToFileDigest: ObjectMap<Digest> = Object.create(null)
+private packageNameToPath: ObjectMap<string> = Object.create(null)
 
 // key is itemid
 itemCtxOfItemId: ArrayMap<ItemCtx> = []
@@ -164,6 +173,32 @@ symbolToItemId: ObjectMap<number> = Object.create(null)
 constructor(
 	private src: PackageSource,
 	private logging: boolean) {
+		function go(m: Module,
+			files: ObjectMap<[Digest, string]>,
+			pathToFileDigest: ObjectMap<Digest>,
+		): void {
+			for (let [name, entry] of Object.entries(m)) {
+				if (entry.tag === "module") go(entry.entries, files, pathToFileDigest)
+				if (entry.tag !== "file") unexpectedMatch(entry.tag)
+
+				// File digest depends on path as file analysis is dependent on its path
+				// since it defines what names are available and is used in error messages
+				let d = digest(`${entry.path}:${entry.text}`)
+				d = name + d
+				mapInsert(files, d, [entry.path, entry.text])
+				mapInsert(pathToFileDigest, entry.path, d)
+			}
+		}
+
+		let files: ObjectMap<[Digest, string]> = Object.create(null)
+		go(src.content, files, this.pathToFileDigest)
+
+		this.qc = new QueryCache([
+				"preparse",
+			],
+			files
+		)
+		mapInsert(this.packageNameToPath, src.name, src.path)
 	}
 
 static makeItemNetwork(): Network {
@@ -190,7 +225,7 @@ log(...xs: any[]): void {
 private reportError(e: CompileError): void {
 	if (this.logging) write(e.log)
 
-	let text = mapGet(this.filePathToText, e.span.filePath)
+	let [path, text] = this.qc.getFile(e.span.file)
 	let offset = e.span.offset
 
 	let tabsize = 2
@@ -215,8 +250,8 @@ private reportError(e: CompileError): void {
 	for (let x of unformattedLine.substring(0, charOffset))
 		cellOffset += x === '\t' ? tabsize : 1
 	let underLinePrefix = ' '.repeat(lineNumberString.length + cellOffset)
-	let fileCrumb = e.span.filePath
-	let underline = `${underLinePrefix}^ (${fileCrumb})`
+	let fileCrumb = path
+	let underline = `${underLinePrefix}^ (in '${fileCrumb}')`
 
 	write(`${formattedLine}
 ${underline}
@@ -226,19 +261,38 @@ Caused by:\n`)
 
 compile(): string {
 	try {
+		// Compute a topological order induced by files importing one another
+		let order: Digest[]
+		let preparses: ObjectMap<PreparseResult<string>>
+		{
+			let fileDigests = this.qc.getFiles()
+			let preparses0 = fileDigests.map(file => {
+				let pr: PreparseResult<any> = preparse(this.qc, file)
+				let infixImportFiles =
+					pr.il.infixImportFiles.map(([pkg, modPath]: any) =>
+						resolveModPath(this.packageNameToPath, pkg, modPath))
+				return [file, { il: { infixImportFiles }, offset: pr.offset }]
+			})
+
+			preparses = Object.fromEntries(preparses0)
+			let edges = (file: Digest) =>
+				mapGet(preparses, file).il.infixImportFiles.map(importPath => {
+					let importedDigest = mapGet(this.pathToFileDigest, importPath)
+					let ix = fileDigests.indexOf(importedDigest)
+					assert(ix !== -1)
+					return ix
+				})
+			order = [...toposortAcyclic(fileDigests, edges)]
+		}
+
 		let infixDecls: InfixDecl[] = []
 		let items: Toplevel[] = []
-		let entries = Object.entries(this.src.content)
-		// Process files in lexicographic order of their names
-		// todo: operator import statements to induce a user-controlled order of parsing
-		entries.sort((x, y) => x[0] < y[0] ? -1 : 1)
 
-		for (let [_name, entry] of entries) {
-			if (entry.tag !== "file") error("todo: nested modules")
-			let path = resolve(entry.path)
-			let text = entry.text
-			mapInsert(this.filePathToText, path, text)
-			items.push(...new Syntax(infixDecls, path, text).syntax())
+		// todo: nested modules
+		for (let file of order) {
+			let [_path, text] = this.qc.getFile(file)
+			let offset = mapGet(preparses, file).offset
+			items.push(...new Syntax(infixDecls, file, text, offset).syntax())
 		}
 
 		for (let item of items) {
@@ -268,8 +322,8 @@ compile(): string {
 	} catch (e) {
 		if (!(e instanceof CompileError)) throw e
 		this.reportError(e)
-		assert(e.cause!==undefined, "expected cause")
-		throw e.cause
+		if (e.cause !== undefined) throw e.cause
+		else throw e
 	}
 }
 }

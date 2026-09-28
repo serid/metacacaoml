@@ -2,6 +2,7 @@ import { assert, assertDefined, assertEq, assertL, assertNonNull, error, every, 
 
 import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
+import type { Digest, QueryCache } from './query-cache.ts'
 
 function isPrefix(s: string, i: number, w: string): boolean {
 	if (w.length > s.length - i) return false
@@ -23,6 +24,8 @@ let identInlautRule = /[a-zA-Z0-9\-/]/
 let infixOperatorInlautRule = /\S/
 // let infixOperatorAuslautRule = infixOperatorAnlautRule
 
+let pathInlautRule = /[a-zA-Z0-9\-/.]/
+
 export const signalingNan = Symbol("signaling-NaN")
 export type HyperReal = number | typeof signalingNan
 
@@ -40,7 +43,7 @@ export type Constructor = { name: string, fields: Field[] }
 export type Annotation = { name: string, text: string }
 export type Binding = { name: string, type: TypeExpr }
 
-export type Span = { filePath: string, offset: number }
+export type Span = { file: Digest, offset: number }
 
 export function mkSpan(item: Toplevel, offset: number): Span {
 	return { ...item.span, offset }
@@ -103,17 +106,15 @@ export type Instr =
 	| { tag: typeof InstrTag.endarrow, span: number }
 
 export class Syntax {
-private i: number = 0
-
 constructor(
-	// todo: import functionality for infix operators
 	private infixDecls: InfixDecl[],
-	private filePath: string,
-	private s: string
+	private file: Digest,
+	private s: string,
+	private i: number = 0
 ) {}
 
 private mkSpan(offset: number): Span {
-	return { filePath: this.filePath, offset }
+	return { file: this.file, offset }
 }
 
 private notPastEof(): boolean {
@@ -227,16 +228,18 @@ private charactersWhile(r: RegExp): string {
 	return s
 }
 
-private ident(): string | null {
+private ident(anlautRule = identAnlautRule, inlautRule = identInlautRule
+		): string | null {
 	if (!this.notPastEof() ||
-		!identAnlautRule.test(this.peekChar()))
+		!anlautRule.test(this.peekChar()))
 		return null
-	let id = this.charactersWhile(identInlautRule)
+	let id = this.charactersWhile(inlautRule)
 	return mangle(id)
 }
 
-private assertIdent(): string {
-	return assertNonNull(this.ident(), "expected ident")
+private assertIdent(anlautRule = identAnlautRule, inlautRule = identInlautRule
+		): string {
+	return assertNonNull(this.ident(anlautRule, inlautRule), "expected ident")
 }
 
 private stringLiteral(end: string): string {
@@ -559,6 +562,48 @@ private toplevel(): Toplevel {
 			{ cause: e })
 	}
 }
+
+// Parse beginning of file for imports
+// Refer to `Language.md` for module system
+preparse(): PreparseResult<[string, string]> {
+	let infixImports: [string, string][] = []
+	this.tryWhitespace()
+	while (this.tryWord("open")) {
+		let isInfix = this.tryWord("infix")
+		assert(isInfix)
+		// scans the whole foo:bar/baz/zap.meml
+		let pkgName = this.assertIdent()
+		this.assertWord(':')
+		let modPath = this.ident(pathInlautRule, pathInlautRule)
+		if (modPath === null)
+			throw new CompileError(this.mkSpan(this.i), 'expected path of form `foo:bar/baz/zap.meml`')
+		infixImports.push([pkgName, modPath])
+	}
+	return { il: { infixImportFiles: infixImports }, offset: this.i }
+}
+}
+
+export type ImportList<Path> = {
+		// list of module-paths to files from which operators are imported
+		// of form ["pkgName", "bar/baz/zap.meml"]
+		infixImportFiles: Path[],
+}
+
+export type PreparseResult<Path> = { il: ImportList<Path>, offset: number}
+
+function preparse0(qc: QueryCache, file: Digest
+		): PreparseResult<[string, string]> {
+	let [_path, text] = qc.getFile(file)
+	return new Syntax([], file, text).preparse()
+}
+
+// Returns imports and offset where to continue parsing
+export function preparse(qc: QueryCache, file: Digest
+		): PreparseResult<[string, string]> {
+	// todo: fileDigest is already a digest, but will be hashed again in getOrCompute
+	// modify object-hash to allow hooking object hashing with ohGetHash(): string
+	// method or something like that
+	return qc.getOrCompute("preparse", [file], preparse0)
 }
 
 function showExpr0(arena: Instr[], boxI: [number], builder: string[]): void {

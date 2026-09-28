@@ -1,3 +1,5 @@
+open infix test:std.meml.rs
+
 fun foo(): String = ""
 @Fails(error: `A' is not a subtype of `B')
 fun f('A 'B x:A): B = x

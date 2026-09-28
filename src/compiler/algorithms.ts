@@ -1,4 +1,4 @@
-import { indices, mkArray } from './util.ts'
+import { error, indices, mkArray } from './util.ts'
 
 export function* toposort<A>(
 	vertices: A[], edges: (_: A) => number[]): Iterable<A> {
@@ -15,16 +15,15 @@ export function* toposort<A>(
 		yield* go(i)
 }
 
-/*
 enum DfsColor {
 	White,
 	Grey,
 	Black,
 }
-export function* toposort<A>(
+export function* toposortAcyclic<A>(
 	vertices: A[],
 	edges: (_: A) => number[],
-	reportCycles: boolean
+	reportCycles: boolean = true
 ): Iterable<A> {
 	let visited = mkArray(vertices.length, DfsColor.White)
 	let intermediateColor = reportCycles ? DfsColor.Grey : DfsColor.Black
@@ -41,7 +40,6 @@ export function* toposort<A>(
 	for (let i of indices(vertices))
 		yield* go(i)
 }
-*/
 
 /*
 // Use BFS to compute longest non-looping distances in the graph
