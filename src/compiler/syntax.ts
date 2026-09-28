@@ -1,4 +1,4 @@
-import { assert, assertDefined, assertEq, assertL, assertNonNull, error, every, Fuel, last, makeFraction, nonExhaustiveMatch, range, toString, unexpectedMatch, unSingleton, view } from './util.ts'
+import { assert, assertDefined, assertEq, assertL, assertNonNull, chain, error, every, find, Fuel, last, makeFraction, nonExhaustiveMatch, range, toString, unexpectedMatch, unSingleton, view } from './util.ts'
 
 import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
@@ -109,23 +109,21 @@ export type Instr =
 // Assuming that, they are purely functional.
 //
 // Only case of non-consumption is illustrated by this equivalence
-// let s = new Syntax(file, text, infixDecls, offset)
+// let s = new Syntax(file, text, importedInfixes, offset)
 // let rpp = s.preparse()
 // let rp = s.parse()
 // is equivalent to
-// let rpp = new Syntax(file, text, infixDecls, offset).preparse()
-// let rp = new Syntax(file, text, infixDecls, rpp.offset).parse()
+// let rpp = new Syntax(file, text, importedInfixes, offset).preparse()
+// let rp = new Syntax(file, text, importedInfixes, rpp.offset).parse()
 export class Syntax {
-private infixDecls: InfixDecl[]
+private exportedInfixes: InfixDecl[] = []
 
 constructor(
 	private file: Digest,
 	private s: string,
-	infixDecls: InfixDecl[],
+	private importedInfixes: InfixDecl[],
 	private i: number
-) {
-	this.infixDecls = infixDecls.slice()
-}
+) {}
 
 private mkSpan(offset: number): Span {
 	return { file: this.file, offset }
@@ -436,9 +434,9 @@ private expr(): Instr[] {
 	let operatorStack: {span:number, decl:InfixDecl}[] = []
 	while (true) {
 		let span = this.i
-		let decl = this.infixDecls.find(
+		let decl = find(chain(this.importedInfixes, this.exportedInfixes),
 			infixDecl => this.tryWord(infixDecl.symbols))
-		if (decl === undefined) break
+		if (decl === null) break
 
 		let strength = unsignalNaN(decl.strength, "operator precedence was NaN")
 
@@ -556,7 +554,7 @@ private toplevel(): Toplevel {
 
 		replacement = mangle(replacement)
 		let infix: InfixDecl = {symbols, associativity, strength, isMethod, replacement}
-		this.infixDecls.push(infix)
+		this.exportedInfixes.push(infix)
 
 		return {tag: ToplevelTag.infixdecl, span: this.mkSpan(span), ...infix}
 	}
@@ -573,7 +571,7 @@ parse(): [Toplevel[], InfixDecl[]] {
 			fuel.step()
 			toplevels.push(this.toplevel())
 		}
-		return [toplevels, this.infixDecls]
+		return [toplevels, this.exportedInfixes]
 	} catch (e) {
 		throw new CompileError(this.mkSpan(this.i), undefined, undefined,
 			{ cause: e })
@@ -622,14 +620,15 @@ export function preparse(qc: QueryCache, file: Digest
 }
 
 function parse0(qc: QueryCache, file: Digest, offset: number,
-	infixDecls: InfixDecl[]): [Toplevel[], InfixDecl[]] {
+	importedInfixes: InfixDecl[]): [Toplevel[], InfixDecl[]] {
 	let [_path, text] = qc.getFile(file)
-	return new Syntax(file, text, infixDecls, offset).parse()
+	return new Syntax(file, text, importedInfixes, offset).parse()
 }
 
+// Returns toplevels and exported infixes
 export function parse(qc: QueryCache, file: Digest, offset: number,
-	infixDecls: InfixDecl[]): [Toplevel[], InfixDecl[]] {
-	return qc.getOrCompute("parse", [file, offset, infixDecls], parse0)
+	importedInfixes: InfixDecl[]): [Toplevel[], InfixDecl[]] {
+	return qc.getOrCompute("parse", [file, offset, importedInfixes], parse0)
 }
 
 function showExpr0(arena: Instr[], boxI: [number], builder: string[]): void {

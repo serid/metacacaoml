@@ -292,6 +292,13 @@ export function findUniqueIndex<A>(
 	return ri
 }
 
+export function find<A>(i: Iterable<A>, f: (_: A) => boolean): A | null {
+	for (let x of i)
+		if (f(x))
+			return x
+	return null
+}
+
 export function indexOf<A>(i: Iterable<A>, x: A): number {
 	for (let [ix, y] of enumerate(i))
 		if (y === x) return ix

@@ -236,16 +236,19 @@ compile(): string {
 			order = [...toposortAcyclic(fileDigests, edges)]
 		}
 
-		let infixDecls: InfixDecl[] = []
+		// key is path to file that exports infixes
+		let infixExports: ObjectMap<InfixDecl[]> = Object.create(null)
 		let items: Toplevel[] = []
 
 		// todo: nested modules
 		for (let file of order) {
-			let offset = mapGet(preparses, file).offset
-			let [toplevels, moreInfixDecls] =
-				parse(this.qc, file, offset, infixDecls)
+			let { il, offset } = mapGet(preparses, file)
+			let importedInfixes = il.infixImportFiles.flatMap(path =>
+				mapGet(infixExports, path))
+			let [toplevels, hereInfixExports] =
+				parse(this.qc, file, offset, importedInfixes)
 			items.push(...toplevels)
-			infixDecls = moreInfixDecls
+			mapInsert(infixExports, this.qc.getFile(file)[0], hereInfixExports)
 		}
 
 		for (let item of items) {
