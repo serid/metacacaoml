@@ -120,7 +120,7 @@ constructor(
 	private src: PackageSource,
 	private logging: boolean) {
 		function go(m: Module,
-			files: ObjectMap<[Digest, string]>,
+			files: ObjectMap<{ path: string, text: string }>,
 			pathToFileDigest: ObjectMap<Digest>,
 		): void {
 			for (let [name, entry] of Object.entries(m)) {
@@ -131,12 +131,12 @@ constructor(
 				// since it defines what names are available and is used in error messages
 				let d = digest(`${entry.path}:${entry.text}`)
 				d = name + d
-				mapInsert(files, d, [entry.path, entry.text])
+				mapInsert(files, d, { path: entry.path, text: entry.text })
 				mapInsert(pathToFileDigest, entry.path, d)
 			}
 		}
 
-		let files: ObjectMap<[Digest, string]> = Object.create(null)
+		let files: ObjectMap<{ path: string, text: string }> = Object.create(null)
 		go(src.content, files, this.pathToFileDigest)
 
 		this.qc = new QueryCache([
@@ -176,7 +176,7 @@ log(...xs: any[]): void {
 private reportError(e: CompileError): void {
 	if (this.logging) write(e.log)
 
-	let [path, text] = this.qc.getFile(e.span.file)
+	let { path, text } = this.qc.getFile(e.span.file)
 	let offset = e.span.offset
 
 	let tabsize = 2
@@ -220,8 +220,10 @@ compile(): string {
 			let preparses0 = fileDigests.map(file => {
 				let pr: PreparseResult<any> = preparse(this.qc, file)
 				let infixImportFiles =
-					pr.il.infixImportFiles.map(([pkg, modPath]: any) =>
-						resolveModPath(this.packageNameToPath, pkg, modPath))
+					pr.il.infixImportFiles.map(modPath0 => {
+						let [pkgName, modPath] = modPath0.split(':')
+						return resolveModPath(this.packageNameToPath, pkgName, modPath)
+					})
 				return [file, { il: { infixImportFiles }, offset: pr.offset }]
 			})
 
@@ -248,7 +250,7 @@ compile(): string {
 			let [toplevels, hereInfixExports] =
 				parse(this.qc, file, offset, importedInfixes)
 			items.push(...toplevels)
-			mapInsert(infixExports, this.qc.getFile(file)[0], hereInfixExports)
+			mapInsert(infixExports, this.qc.getFile(file).path, hereInfixExports)
 		}
 
 		for (let item of items) {

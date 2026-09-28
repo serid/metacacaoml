@@ -580,8 +580,8 @@ parse(): [Toplevel[], InfixDecl[]] {
 
 // Parse beginning of file for imports
 // Refer to `Language.md` for module system
-preparse(): PreparseResult<[string, string]> {
-	let infixImports: [string, string][] = []
+preparse(): PreparseResult<ModPath> {
+	let infixImports: ModPath[] = []
 	this.tryWhitespace()
 	while (this.tryWord("open")) {
 		let isInfix = this.tryWord("infix")
@@ -592,7 +592,7 @@ preparse(): PreparseResult<[string, string]> {
 		let modPath = this.ident(pathInlautRule, pathInlautRule)
 		if (modPath === null)
 			throw new CompileError(this.mkSpan(this.i), 'expected path of form `foo:bar/baz/zap.meml`')
-		infixImports.push([pkgName, modPath])
+		infixImports.push(`${pkgName}:${modPath}`)
 	}
 	return { il: { infixImportFiles: infixImports }, offset: this.i }
 }
@@ -605,23 +605,24 @@ export type ImportList<Path> = {
 }
 
 export type PreparseResult<Path> = { il: ImportList<Path>, offset: number}
-
+// pkgName:module/module/file.meml
+export type ModPath = string
 function preparse0(qc: QueryCache, file: Digest
-		): PreparseResult<[string, string]> {
-	let [_path, text] = qc.getFile(file)
+		): PreparseResult<ModPath> {
+	let { path: _, text } = qc.getFile(file)
 	return new Syntax(file, text, [], 0).preparse()
 }
 
 // Returns imports and offset where to continue parsing
 export function preparse(qc: QueryCache, file: Digest
-		): PreparseResult<[string, string]> {
+		): PreparseResult<ModPath> {
 	// Digest already available. Collapse ['hash'] to 'hash' and skip secondary rehashing.
 	return qc.getOrComputeKnownDigest("preparse", [file], file, preparse0)
 }
 
 function parse0(qc: QueryCache, file: Digest, offset: number,
 	importedInfixes: InfixDecl[]): [Toplevel[], InfixDecl[]] {
-	let [_path, text] = qc.getFile(file)
+	let { path: _, text } = qc.getFile(file)
 	return new Syntax(file, text, importedInfixes, offset).parse()
 }
 

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 
 import objectHash from './vendor/object-hash/object-hash.js'
 
-import { mapGet, mapInsertIfNotPresentP, mapSet, todo, write, type ObjectMap, type ObjectSet } from './util.ts'
+import { error, mapGet, mapInsertIfNotPresentP, mapSet, todo, view, write, type ObjectMap, type ObjectSet } from './util.ts'
 
 export type BinaryString = string
 export type Digest = BinaryString
@@ -15,14 +15,19 @@ export function bufferToBinaryString(buf: Buffer): BinaryString {
 	// surrogate code units
 	return buf.toString("utf-16le")
 }
+export function binaryStringToBuffer(bs: BinaryString): Buffer {
+	return Buffer.from(bs, "utf-16le")
+}
+
 export function binaryStringToBase64(bs: BinaryString): string {
-	return Buffer.from(bs, "utf-16le").toString("base64")
+	return binaryStringToBuffer(bs).toString("base64")
 }
 
 // A digest is a hash used as a compressed representation of data, suitable for
 // equality testing.
 // The equality test achieved by comparing digests is probalistic -- if two data instances are equal, they will certainly have equal digests. However when digests compare equal, original data might turn out to be different with a vanishingly small probability.
 export let digestAlgorithm = "md5"
+export let digestLength = 16
 export let digestTiming = 0
 export function digestSlow(o: any): BinaryString {
 	let time = performance.now()
@@ -64,6 +69,26 @@ export function digest(o: any): BinaryString {
 // md4, md5, ripemd160, sha1, sha224, sha256, sha384, sha512, sha512-224,
 // sha512-256, sha3-224, sha3-256, sha3-384, sha3-512
 
+// Digests have high entropy, so it is admissible to combine them by XORing.
+// This might even cryptographically safe if the attacker only controls data
+// before digestion and not the immediate digests put into XOR.
+export function combineDigests(digests: Digest[]): Digest {
+	if (digests.length === 0) error("expected at least 1 element")
+	if (digests.length === 1) return digests[0]
+
+	// Copy `digestLength` bytes of 0th element, then XOR remaining elements
+	// against the accumulator.
+	let buf = Buffer.allocUnsafe(digestLength)
+	binaryStringToBuffer(digests[0]).copy(buf, 0, digestLength)
+	for (let x of view(digests, 1)) {
+		let xb = binaryStringToBuffer(x)
+		for (let i = 0; i < digestLength; ++i)
+			buf[i] ^= xb[i]
+	}
+
+	return bufferToBinaryString(buf)
+}
+
 // Essentially a memoization cache for pure functions. Deviates from usual
 // memoization in that instead of storing a complete copy of a previous
 // argument list, it stores a long digest and uses it as a proxy when comparing
@@ -75,7 +100,7 @@ export class QueryCache {
 
 	// Content-addressed storage. First key is some label, then Digest.
 	// Use this to get a pure reference to some bulky data you don't want to hash
-	// every time it's used as a query argument.
+	// every time it's used as a query argument. Also acts as a "hash cons".
 	// CAS and `cache` are ocasionally garbage-collected. GC treats as live any
 	// digest in `gcRoots`, but also scans found live objects in CAS and `cache`
 	// for Digest strings, they are also counted live and are scanned further
@@ -87,7 +112,7 @@ export class QueryCache {
 		queryNames: string[],
 		casNames: string[],
 		// maps file digest to its path and text, a true content-addressed storage
-		private files: ObjectMap<[string, string]>) {
+		private files: ObjectMap<{ path: string, text: string }>) {
 		for (let query of queryNames) this.cache[query] = Object.create(null)
 		for (let casName of casNames) this.cas[casName] = Object.create(null)
 	}
@@ -106,12 +131,16 @@ export class QueryCache {
 	// into one hashmap.
 	getOrComputeKnownDigest<A, Ts extends any[]>(query: string, args: Ts, d: Digest,
 		f: (qc: QueryCache, ..._: Ts) => A): A {
+		// todo: time some queries with and without caching to estimate hashing
+		// cost. like in
+		// https://github.com/XyraSinclair/memotuple/blob/main/DESIGN.md#5-smart-metering
+
 		// write(`> ${query}(${join(args)})`)
 		let row = mapGet(this.cache, query)
 		let key = d
 		let value = row[key]
 		if (value !== undefined) {
-			write(`cache hit: ${key}`)
+			write(`cache hit: ${query} ${key}`)
 			return value
 		}
 
@@ -124,7 +153,7 @@ export class QueryCache {
 	}
 
 	// pure function (except on error), use in queries
-	getFile(fileDigest: Digest): [string, string] {
+	getFile(fileDigest: Digest): { path: string, text: string } {
 		return mapGet(this.files, fileDigest)
 	}
 
