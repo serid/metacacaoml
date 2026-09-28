@@ -617,10 +617,8 @@ function preparse0(qc: QueryCache, file: Digest
 // Returns imports and offset where to continue parsing
 export function preparse(qc: QueryCache, file: Digest
 		): PreparseResult<[string, string]> {
-	// todo: fileDigest is already a digest, but will be hashed again in getOrCompute
-	// modify object-hash to allow hooking object hashing with ohGetHash(): string
-	// method or something like that
-	return qc.getOrCompute("preparse", [file], preparse0)
+	// Digest already available. Collapse ['hash'] to 'hash' and skip secondary rehashing.
+	return qc.getOrComputeKnownDigest("preparse", [file], file, preparse0)
 }
 
 function parse0(qc: QueryCache, file: Digest, offset: number,

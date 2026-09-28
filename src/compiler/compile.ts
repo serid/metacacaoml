@@ -7,7 +7,7 @@ import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
 import { Huk, RootTyck } from './huk.ts'
 import { foldDirectory } from './node-util.ts'
-import { type Digest, digest, QueryCache } from './query-cache.ts'
+import { type Digest, digest, digestAlgorithm, digestTiming, QueryCache } from './query-cache.ts'
 import { type InfixDecl, InstrTag, parse, preparse, type PreparseResult, type Span, type Toplevel, ToplevelTag } from './syntax.ts'
 
 export class CompileError extends Error {
@@ -56,9 +56,11 @@ export class ItemCtx {
 	constructor(
 		private compiler: Compiler,
 		private rootTyck: RootTyck, cg: RootCodegen | null,
-		public network: Network, private item: Toplevel) {
-		this.tyck = new Huk(compiler.qc, compiler, this, rootTyck, item)
-		this.cg = new ItemCodegen(compiler.qc, this, cg, rootTyck, item)
+		public network: Network,
+		private item: Toplevel,
+		d: Digest) {
+		this.tyck = new Huk(compiler.qc, compiler, this, rootTyck, item, d)
+		this.cg = new ItemCodegen(compiler.qc, this, cg, rootTyck, item, d)
 	}
 
 	// jit compile and close the code with a _fixtures_ object
@@ -141,6 +143,9 @@ constructor(
 				"preparse",
 				"parse",
 				"get-toplevel-symbols",
+			],
+			[
+				"item"
 			],
 			files
 		)
@@ -244,9 +249,10 @@ compile(): string {
 		}
 
 		for (let item of items) {
+			let d = this.qc.casAdd("item", item)
 			let itemCtx = new ItemCtx(
-				this, this.tyck, this.cg, Compiler.makeItemNetwork(), item)
-			for (let symbol of getToplevelSymbols(this.qc, item))
+				this, this.tyck, this.cg, Compiler.makeItemNetwork(), item, d)
+			for (let symbol of getToplevelSymbols(this.qc, d))
 				mapInsert(this.symbolToItemId, symbol, this.itemCtxOfItemId.length)
 			this.itemCtxOfItemId.push(itemCtx)
 		}
@@ -266,6 +272,7 @@ compile(): string {
 		}
 
 		this.log(`normalizations count: ` + this.tyck.normalCounter)
+		this.log(`${digestAlgorithm} hashing time:`, digestTiming, `ms`)
 		return this.cg.getCode()
 	} catch (e) {
 		if (!(e instanceof CompileError)) throw e
@@ -277,7 +284,8 @@ compile(): string {
 }
 
 // Symbols introduced by an item
-function getToplevelSymbols0(_qc: QueryCache, item: Toplevel): string[] {
+function getToplevelSymbols0(qc: QueryCache, item0: Digest): string[] {
+	let item: Toplevel = qc.casGet("item", item0)
 	switch (item.tag) {
 	case ToplevelTag.axiom:
 		return [item.name]
@@ -321,14 +329,11 @@ function getToplevelSymbols0(_qc: QueryCache, item: Toplevel): string[] {
 	}
 }
 
-// todo: memoize
-export function getToplevelSymbols(qc: QueryCache, item: Toplevel): string[] {
-	return getToplevelSymbols0(qc, item)
-
-	// Digest computation is abysmally slow. Figure out how to replace large objects with CAS, then reenable.
-	// return qc.getOrCompute("get-toplevel-symbols", [item], getToplevelSymbols0)
+export function getToplevelSymbols(qc: QueryCache, item: Digest): string[] {
+	// Digest already available. Collapse ['hash'] to 'hash' and skip secondary rehashing.
+	return qc.getOrComputeKnownDigest("get-toplevel-symbols", [item], item, getToplevelSymbols0)
 }
 
-export function getToplevelSymbol(qc: QueryCache, item: Toplevel): string {
+export function getToplevelSymbol(qc: QueryCache, item: Digest): string {
 	return unSingleton(getToplevelSymbols(qc, item))
 }

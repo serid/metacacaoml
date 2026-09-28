@@ -127,11 +127,22 @@ export function mapInsert<A>(
 }
 
 export function mapInsertIfNotPresent<A>(
+		o: ObjectMap<A>, key: string | number, value: A): void {
+	assert(["string","number"].includes(typeof key))
+	if (o[key] === undefined) o[key] = value
+}
+
+export function mapInsertIfNotPresentP<A>(
 		o: ObjectMap<A>, key: string | number, producer: () => A): A {
 	assert(["string","number"].includes(typeof key))
 	let value = o[key]
 	if (value !== undefined) return value
 	return o[key] = producer()
+}
+
+export function mapSet<A>(o: ObjectMap<A>, key: string | number, value: A): void {
+	assert(["string","number"].includes(typeof key))
+	o[key] = value
 }
 
 export function mapGet<A>(o: ObjectMap<A>, key: string | number): A {

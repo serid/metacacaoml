@@ -1,7 +1,7 @@
 import { any, assert, assertDefined, assertEq, assertL, Dexterity, error, every, exceptionCauses, filter, findUniqueIndex, first, flipHands, GeneratorFunction, join, LateInit, map, mapFilterMapProjection, mapGet, mapInsert, mapRemove, nextLast, nonExhaustiveMatch, prettyPrint, range, unexpectedMatch, view, write, zip, type ObjectMap } from './util.ts'
 
 import { CompileError, Compiler, getToplevelSymbol, getToplevelSymbols, ItemCtx } from './compile.ts'
-import type { QueryCache } from './query-cache.ts'
+import type { Digest, QueryCache } from './query-cache.ts'
 import { InstrTag, mkSpan, showExpr, ToplevelTag, type Constructor, type Instr, type Span, type Toplevel, type TypeExpr } from './syntax.ts'
 
 //! Implements typechecking using an algorithm from
@@ -74,7 +74,9 @@ constructor(
 	private compiler: Compiler,
 	private itemCtx: ItemCtx,
 	private root: RootTyck, // toplevel tycker
-	private item: Toplevel) {}
+	private item: Toplevel,
+	private	d: Digest
+) {}
 
 private arena(): Instr[] {
 	return any(this.item).arena
@@ -170,8 +172,9 @@ private normalize(tyExpr: TypeExpr): any {
 	let paramNames = envv.map(x=>x[0])
 	let args = envv.map(x=>x[1])
 
+	let d = this.qc.casAdd("item", tyExpr)
 	let nakedCtx = new ItemCtx(
-		this.compiler, this.root, null, Compiler.makeItemNetwork(), tyExpr)
+		this.compiler, this.root, null, Compiler.makeItemNetwork(), tyExpr, d)
 
 	//kinda hacky idk
 	nakedCtx.tyck.ctx = [...this.ctx]
@@ -700,7 +703,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 		return false
 	}
 	case ToplevelTag.cls: {
-		let symbol = first(getToplevelSymbols(this.qc, this.item))
+		let symbol = first(getToplevelSymbols(this.qc, this.d))
 		// add type constructor to globals
 		mapInsert(this.root.globals, symbol, {
 			gs: item.gs,
@@ -756,7 +759,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 		break
 	}
 	case ToplevelTag._let: {
-		let symbol = getToplevelSymbol(this.qc, this.item)
+		let symbol = getToplevelSymbol(this.qc, this.d)
 		let ty = this.normalize(item.retT)
 		this.check(ty)
 		mapInsert(this.root.globals, symbol, {
@@ -781,7 +784,7 @@ private tyck_(resolve: (_: boolean) => void): boolean {
 		let domain = normalParams
 		let codomain = this.normalize(item.retT)
 
-		let symbol = getToplevelSymbol(this.qc, this.item)
+		let symbol = getToplevelSymbol(this.qc, this.d)
 
 		mapInsert(this.root.globals, symbol, {
 			gs: item.gs,
