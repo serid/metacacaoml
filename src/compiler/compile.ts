@@ -8,7 +8,7 @@ import { Network } from './flow.ts'
 import { Huk, RootTyck } from './huk.ts'
 import { foldDirectory } from './node-util.ts'
 import { type Digest, digest, QueryCache } from './query-cache.ts'
-import { type InfixDecl, InstrTag, preparse, type PreparseResult, type Span, Syntax, type Toplevel, ToplevelTag } from './syntax.ts'
+import { type InfixDecl, InstrTag, parse, preparse, type PreparseResult, type Span, type Toplevel, ToplevelTag } from './syntax.ts'
 
 export class CompileError extends Error {
 	constructor(public span: Span, public log: string = "", message?: string,
@@ -195,6 +195,7 @@ constructor(
 
 		this.qc = new QueryCache([
 				"preparse",
+				"parse",
 			],
 			files
 		)
@@ -290,9 +291,11 @@ compile(): string {
 
 		// todo: nested modules
 		for (let file of order) {
-			let [_path, text] = this.qc.getFile(file)
 			let offset = mapGet(preparses, file).offset
-			items.push(...new Syntax(infixDecls, file, text, offset).syntax())
+			let [toplevels, moreInfixDecls] =
+				parse(this.qc, file, offset, infixDecls)
+			items.push(...toplevels)
+			infixDecls = moreInfixDecls
 		}
 
 		for (let item of items) {

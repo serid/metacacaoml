@@ -376,15 +376,13 @@ export class LateInit<T> {
 	}
 }
 
-class Fuel {
-	constructor(private x: number) {}
+export class Fuel {
+	constructor(private x: number = 3000) {}
 
 	step(): void {
 		if (--this.x === 0) error("all out of fuel")
 	}
 }
-
-export let fuel = new Fuel(1000)
 
 // great stuff right here
 export const GeneratorFunction: any =

@@ -1,4 +1,4 @@
-import { assert, assertDefined, assertEq, assertL, assertNonNull, error, every, fuel, last, makeFraction, nonExhaustiveMatch, range, toString, unexpectedMatch, unSingleton, view } from './util.ts'
+import { assert, assertDefined, assertEq, assertL, assertNonNull, error, every, Fuel, last, makeFraction, nonExhaustiveMatch, range, toString, unexpectedMatch, unSingleton, view } from './util.ts'
 
 import { mangle } from './codegen.ts'
 import { CompileError } from './compile.ts'
@@ -105,13 +105,27 @@ export type Instr =
 	| { tag: typeof InstrTag.arrow, span: number }
 	| { tag: typeof InstrTag.endarrow, span: number }
 
+// All public methods consume `this`, rendering its state unspecified.
+// Assuming that, they are purely functional.
+//
+// Only case of non-consumption is illustrated by this equivalence
+// let s = new Syntax(file, text, infixDecls, offset)
+// let rpp = s.preparse()
+// let rp = s.parse()
+// is equivalent to
+// let rpp = new Syntax(file, text, infixDecls, offset).preparse()
+// let rp = new Syntax(file, text, infixDecls, rpp.offset).parse()
 export class Syntax {
+private infixDecls: InfixDecl[]
+
 constructor(
-	private infixDecls: InfixDecl[],
 	private file: Digest,
 	private s: string,
-	private i: number = 0
-) {}
+	infixDecls: InfixDecl[],
+	private i: number
+) {
+	this.infixDecls = infixDecls.slice()
+}
 
 private mkSpan(offset: number): Span {
 	return { file: this.file, offset }
@@ -550,13 +564,16 @@ private toplevel(): Toplevel {
 		error("expected toplevel")
 }
 
-*syntax(): Iterable<Toplevel> {
+parse(): [Toplevel[], InfixDecl[]] {
+	let toplevels = []
+	let fuel = new Fuel()
 	try {
-	this.tryWhitespace()
-	while (this.notPastEof()) {
-		fuel.step()
-		yield this.toplevel()
-	}
+		this.tryWhitespace()
+		while (this.notPastEof()) {
+			fuel.step()
+			toplevels.push(this.toplevel())
+		}
+		return [toplevels, this.infixDecls]
 	} catch (e) {
 		throw new CompileError(this.mkSpan(this.i), undefined, undefined,
 			{ cause: e })
@@ -594,7 +611,7 @@ export type PreparseResult<Path> = { il: ImportList<Path>, offset: number}
 function preparse0(qc: QueryCache, file: Digest
 		): PreparseResult<[string, string]> {
 	let [_path, text] = qc.getFile(file)
-	return new Syntax([], file, text).preparse()
+	return new Syntax(file, text, [], 0).preparse()
 }
 
 // Returns imports and offset where to continue parsing
@@ -604,6 +621,17 @@ export function preparse(qc: QueryCache, file: Digest
 	// modify object-hash to allow hooking object hashing with ohGetHash(): string
 	// method or something like that
 	return qc.getOrCompute("preparse", [file], preparse0)
+}
+
+function parse0(qc: QueryCache, file: Digest, offset: number,
+	infixDecls: InfixDecl[]): [Toplevel[], InfixDecl[]] {
+	let [_path, text] = qc.getFile(file)
+	return new Syntax(file, text, infixDecls, offset).parse()
+}
+
+export function parse(qc: QueryCache, file: Digest, offset: number,
+	infixDecls: InfixDecl[]): [Toplevel[], InfixDecl[]] {
+	return qc.getOrCompute("parse", [file, offset, infixDecls], parse0)
 }
 
 function showExpr0(arena: Instr[], boxI: [number], builder: string[]): void {
