@@ -104,8 +104,8 @@ export class QueryCache {
 	// invocations of this method for a given query name use the same convention.
 	// This collapse is erroneous if I ever merge caches for different query names
 	// into one hashmap.
-	getOrComputeKnownDigest<A>(query: string, args: any[], d: Digest,
-		f: (qc: QueryCache, ..._: any[]) => A): A {
+	getOrComputeKnownDigest<A, Ts extends any[]>(query: string, args: Ts, d: Digest,
+		f: (qc: QueryCache, ..._: Ts) => A): A {
 		// write(`> ${query}(${join(args)})`)
 		let row = mapGet(this.cache, query)
 		let key = d
