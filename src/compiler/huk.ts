@@ -172,7 +172,7 @@ private normalize(tyExpr: TypeExpr): any {
 	let paramNames = envv.map(x=>x[0])
 	let args = envv.map(x=>x[1])
 
-	let d = this.qc.casAdd("item", tyExpr)
+	let d = this.qc.casAdd("item", tyExpr, "@tyExpr")
 	let nakedCtx = new ItemCtx(
 		this.compiler, this.root, null, Compiler.makeItemNetwork(), tyExpr, d)
 

@@ -111,8 +111,7 @@ export class QueryCache {
 	constructor(
 		queryNames: string[],
 		casNames: string[],
-		// maps file digest to its path and text, a true content-addressed storage
-		private files: ObjectMap<{ path: string, text: string }>) {
+	) {
 		for (let query of queryNames) this.cache[query] = Object.create(null)
 		for (let casName of casNames) this.cas[casName] = Object.create(null)
 	}
@@ -147,21 +146,12 @@ export class QueryCache {
 		return row[key] = f(this, ...args)
 	}
 
-	// changes every program execution, do not use in queries
-	getFiles(): Digest[] {
-		return Object.keys(this.files)
-	}
-
-	// pure function (except on error), use in queries
-	getFile(fileDigest: Digest): { path: string, text: string } {
-		return mapGet(this.files, fileDigest)
-	}
-
-	casAdd(type: string, o: any): Digest {
-		let d = digest(o)
+	casAdd(type: string, o: any, label: string): Digest {
+		let d = `${digest(o)}-${label}`
 
 		// If an entry is already present at this key, keep its old value since
-		// it is equal to `o` (very very probably).
+		// it is equal to `o` (very very probably). We don't even bother comparing
+		// old and new value like hash cons does.
 		mapInsertIfNotPresentP(mapGet(this.cas, type), d, () => {
 			// Add gc root
 			mapSet(this.gcRoots, d, null)
@@ -177,4 +167,9 @@ export class QueryCache {
 	private gc(): void {
 		todo()
 	}
+}
+
+export function getFile(qc: QueryCache, fileDigest: Digest
+	): { path: string, text: string } {
+	return qc.casGet("file", fileDigest)
 }

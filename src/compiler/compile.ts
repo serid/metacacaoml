@@ -7,7 +7,7 @@ import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
 import { Huk, RootTyck } from './huk.ts'
 import { foldDirectory } from './node-util.ts'
-import { type Digest, digest, digestAlgorithm, digestTiming, QueryCache } from './query-cache.ts'
+import { type Digest, digestAlgorithm, digestTiming, getFile, QueryCache } from './query-cache.ts'
 import { InstrTag, parse, type Span, type Toplevel, ToplevelTag } from './syntax.ts'
 
 export class CompileError extends Error {
@@ -120,24 +120,20 @@ constructor(
 	private src: PackageSource,
 	private logging: boolean) {
 		function go(m: Module,
-			files: ObjectMap<{ path: string, text: string }>,
 			pathToFileDigest: ObjectMap<Digest>,
+			insertFile: (entry: { path: string, text: string }) => Digest,
 		): void {
-			for (let [name, entry] of Object.entries(m)) {
-				if (entry.tag === "module") go(entry.entries, files, pathToFileDigest)
+			for (let entry of Object.values(m)) {
+				if (entry.tag === "module")
+					go(entry.entries, pathToFileDigest, insertFile)
 				if (entry.tag !== "file") unexpectedMatch(entry.tag)
 
 				// File digest depends on path as file analysis is dependent on its path
 				// since it defines what names are available and is used in error messages
-				let d = digest(`${entry.path}:${entry.text}`)
-				d = name + d
-				mapInsert(files, d, { path: entry.path, text: entry.text })
+				let d = insertFile({ path: entry.path, text: entry.text })
 				mapInsert(pathToFileDigest, entry.path, d)
 			}
 		}
-
-		let files: ObjectMap<{ path: string, text: string }> = Object.create(null)
-		go(src.content, files, this.pathToFileDigest)
 
 		this.qc = new QueryCache([
 				"preparse",
@@ -148,10 +144,15 @@ constructor(
 				"get-toplevel-symbols",
 			],
 			[
+				"file",
 				"item"
 			],
-			files
 		)
+
+		let insertFile = (entry: { path: string, text: string }) =>
+			this.qc.casAdd("file", entry, entry.path)
+		go(src.content, this.pathToFileDigest, insertFile)
+
 		mapInsert(this.packageNameToPath, src.name, src.path)
 	}
 
@@ -179,7 +180,7 @@ log(...xs: any[]): void {
 private reportError(e: CompileError): void {
 	if (this.logging) write(e.log)
 
-	let { path, text } = this.qc.getFile(e.span.file)
+	let { path, text } = getFile(this.qc, e.span.file)
 	let offset = e.span.offset
 
 	let tabsize = 2
@@ -230,7 +231,7 @@ compile(): string {
 		}
 
 		for (let item of items) {
-			let d = this.qc.casAdd("item", item)
+			let d = this.qc.casAdd("item", item, "@compile")
 			let itemCtx = new ItemCtx(
 				this, this.tyck, this.cg, Compiler.makeItemNetwork(), item, d)
 			for (let symbol of getToplevelSymbols(this.qc, d))

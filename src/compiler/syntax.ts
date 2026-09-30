@@ -3,7 +3,7 @@ import { assert, assertDefined, assertEq, assertL, assertNonNull, chain, error, 
 import { isAcyclic } from './algorithms.ts'
 import { mangle } from './codegen.ts'
 import { CompileError, resolveModPath } from './compile.ts'
-import type { Digest, QueryCache } from './query-cache.ts'
+import { getFile, type Digest, type QueryCache } from './query-cache.ts'
 
 function isPrefix(s: string, i: number, w: string): boolean {
 	if (w.length > s.length - i) return false
@@ -610,7 +610,7 @@ export type PreparseResult<Path> = { il: ImportList<Path>, offset: number}
 export type ModPath = string
 function preparse0(qc: QueryCache, file: Digest
 		): PreparseResult<ModPath> {
-	let { path: _, text } = qc.getFile(file)
+	let { path: _, text } = getFile(qc, file)
 	return new Syntax(file, text, [], 0).preparse()
 }
 
@@ -642,7 +642,7 @@ function resolveImports(qc: QueryCache, file: Digest,
 
 function parseFrom0(qc: QueryCache, file: Digest, offset: number,
 	importedInfixes: InfixDecl[]): [Toplevel[], InfixDecl[]] {
-	let { path: _, text } = qc.getFile(file)
+	let { path: _, text } = getFile(qc, file)
 	return new Syntax(file, text, importedInfixes, offset).parse()
 }
 
