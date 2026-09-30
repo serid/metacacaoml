@@ -1,7 +1,8 @@
-import { assert, assertDefined, assertEq, assertL, assertNonNull, chain, error, every, find, Fuel, last, makeFraction, nonExhaustiveMatch, range, toString, unexpectedMatch, unSingleton, view } from './util.ts'
+import { assert, assertDefined, assertEq, assertL, assertNonNull, chain, error, every, find, Fuel, last, makeFraction, mapGet, nonExhaustiveMatch, range, toString, unexpectedMatch, unSingleton, view, type ObjectMap } from './util.ts'
 
+import { isAcyclic } from './algorithms.ts'
 import { mangle } from './codegen.ts'
-import { CompileError } from './compile.ts'
+import { CompileError, resolveModPath } from './compile.ts'
 import type { Digest, QueryCache } from './query-cache.ts'
 
 function isPrefix(s: string, i: number, w: string): boolean {
@@ -620,16 +621,83 @@ export function preparse(qc: QueryCache, file: Digest
 	return qc.getOrComputeKnownDigest("preparse", [file], file, preparse0)
 }
 
-function parse0(qc: QueryCache, file: Digest, offset: number,
+function resolveImports0(qc: QueryCache, file: Digest,
+		packageNameToPath: ObjectMap<string>, pathToFileDigest: ObjectMap<Digest>
+		): { path: string, d: Digest }[] {
+	// todo: possibly merge into `preparse`
+
+	let { il, offset: _offset } = preparse(qc, file)
+	return il.infixImportFiles.map(modPath0 => {
+			let [pkgName, modPath] = modPath0.split(':')
+			let importPath = resolveModPath(packageNameToPath, pkgName, modPath)
+			return { path: importPath, d: mapGet(pathToFileDigest, importPath) }
+		})
+}
+
+function resolveImports(qc: QueryCache, file: Digest,
+		packageNameToPath: ObjectMap<string>, pathToFileDigest: ObjectMap<Digest>
+		): { path: string, d: Digest }[] {
+	return qc.getOrCompute("resolve-imports", [file, packageNameToPath, pathToFileDigest], resolveImports0)
+}
+
+function parseFrom0(qc: QueryCache, file: Digest, offset: number,
 	importedInfixes: InfixDecl[]): [Toplevel[], InfixDecl[]] {
 	let { path: _, text } = qc.getFile(file)
 	return new Syntax(file, text, importedInfixes, offset).parse()
 }
 
 // Returns toplevels and exported infixes
-export function parse(qc: QueryCache, file: Digest, offset: number,
+export function parseFrom(qc: QueryCache, file: Digest, offset: number,
 	importedInfixes: InfixDecl[]): [Toplevel[], InfixDecl[]] {
-	return qc.getOrCompute("parse", [file, offset, importedInfixes], parse0)
+	return qc.getOrCompute("parse-from", [file, offset, importedInfixes], parseFrom0)
+}
+
+function parse0(qc: QueryCache, file: Digest,
+		packageNameToPath: ObjectMap<string>, pathToFileDigest: ObjectMap<Digest>
+		): [Toplevel[], InfixDecl[]] {
+	assertInfixImportAcyclicity(qc, packageNameToPath, pathToFileDigest)
+	let { il: _il, offset } = preparse(qc, file)
+	let resolvedImports =
+		resolveImports(qc, file, packageNameToPath, pathToFileDigest)
+	let importedInfixDecls =
+		resolvedImports.flatMap(({ d }) => {
+			let [_toplevel, exportedInfixes] = parse(
+				qc, d, packageNameToPath, pathToFileDigest)
+			return exportedInfixes
+		})
+
+	return parseFrom(qc, file, offset, importedInfixDecls)
+}
+
+// Returns toplevels and exported infixes
+// n. b.: parsing depends on what files are available. If an imported file is
+// removed, parsing would fail, but the compiler cannot reach this state as it
+// does not have a digest to put into the query system.
+export function parse(qc: QueryCache, file: Digest,
+		packageNameToPath: ObjectMap<string>, pathToFileDigest: ObjectMap<Digest>
+		): [Toplevel[], InfixDecl[]] {
+	return qc.getOrCompute("parse", [file, packageNameToPath, pathToFileDigest], parse0)
+}
+
+export function assertInfixImportAcyclicity0(qc: QueryCache,
+		packageNameToPath: ObjectMap<string>, pathToFileDigest: ObjectMap<Digest>
+		): void {
+	// Compute a topological order induced by files importing one another
+	let fileDigests = Object.values(pathToFileDigest)
+	let edges = (file: Digest) =>
+		resolveImports(qc, file, packageNameToPath, pathToFileDigest).map(importPath => {
+			let ix = fileDigests.indexOf(importPath.d)
+			assert(ix !== -1)
+			return ix
+		})
+	if (!isAcyclic(fileDigests, edges)) error("Some infix imports form a cycle. "
+		+ "That's all I know!")
+}
+
+export function assertInfixImportAcyclicity(qc: QueryCache,
+	packageNameToPath: ObjectMap<string>, pathToFileDigest: ObjectMap<Digest>
+	): void {
+	return qc.getOrCompute("assert-infix-import-acyclicity", [packageNameToPath, pathToFileDigest], assertInfixImportAcyclicity0)
 }
 
 function showExpr0(arena: Instr[], boxI: [number], builder: string[]): void {

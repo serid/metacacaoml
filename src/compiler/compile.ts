@@ -2,13 +2,13 @@ import { basename, join } from 'node:path'
 
 import { any, type ArrayMap, assert, chain, error, map, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unexpectedMatch, unSingleton, write } from './util.ts'
 
-import { toposort, toposortAcyclic } from './algorithms.ts'
+import { toposort } from './algorithms.ts'
 import { ItemCodegen, RootCodegen } from './codegen.ts'
 import { Network } from './flow.ts'
 import { Huk, RootTyck } from './huk.ts'
 import { foldDirectory } from './node-util.ts'
 import { type Digest, digest, digestAlgorithm, digestTiming, QueryCache } from './query-cache.ts'
-import { type InfixDecl, InstrTag, parse, preparse, type PreparseResult, type Span, type Toplevel, ToplevelTag } from './syntax.ts'
+import { InstrTag, parse, type Span, type Toplevel, ToplevelTag } from './syntax.ts'
 
 export class CompileError extends Error {
 	constructor(public span: Span, public log: string = "", message?: string,
@@ -41,7 +41,7 @@ export async function readPackageSourceFromFs(dirPath: string): Promise<PackageS
 	return { path: dirPath, name, content }
 }
 
-function resolveModPath(
+export function resolveModPath(
 		packageNameToPath: ObjectMap<string>, pkgName: string, modPath: string
 		): string {
 	return join(mapGet(packageNameToPath, pkgName), modPath)
@@ -141,7 +141,10 @@ constructor(
 
 		this.qc = new QueryCache([
 				"preparse",
+				"resolve-imports",
+				"parse-from",
 				"parse",
+				"assert-infix-import-acyclicity",
 				"get-toplevel-symbols",
 			],
 			[
@@ -212,45 +215,18 @@ Caused by:\n`)
 
 compile(): string {
 	try {
-		// Compute a topological order induced by files importing one another
-		let order: Digest[]
-		let preparses: ObjectMap<PreparseResult<string>>
-		{
-			let fileDigests = this.qc.getFiles()
-			let preparses0 = fileDigests.map(file => {
-				let pr: PreparseResult<any> = preparse(this.qc, file)
-				let infixImportFiles =
-					pr.il.infixImportFiles.map(modPath0 => {
-						let [pkgName, modPath] = modPath0.split(':')
-						return resolveModPath(this.packageNameToPath, pkgName, modPath)
-					})
-				return [file, { il: { infixImportFiles }, offset: pr.offset }]
-			})
-
-			preparses = Object.fromEntries(preparses0)
-			let edges = (file: Digest) =>
-				mapGet(preparses, file).il.infixImportFiles.map(importPath => {
-					let importedDigest = mapGet(this.pathToFileDigest, importPath)
-					let ix = fileDigests.indexOf(importedDigest)
-					assert(ix !== -1)
-					return ix
-				})
-			order = [...toposortAcyclic(fileDigests, edges)]
-		}
-
-		// key is path to file that exports infixes
-		let infixExports: ObjectMap<InfixDecl[]> = Object.create(null)
 		let items: Toplevel[] = []
 
+		// todo: make typechecking and codegen pure and independent of processing
+		// order. In final target code concatenation order matters for let
+		// definitions because they execute top down.
+		let files = Object.entries(this.pathToFileDigest)
+		files.sort((x, y) => x[0] < y[0] ? -1 : 1)
 		// todo: nested modules
-		for (let file of order) {
-			let { il, offset } = mapGet(preparses, file)
-			let importedInfixes = il.infixImportFiles.flatMap(path =>
-				mapGet(infixExports, path))
-			let [toplevels, hereInfixExports] =
-				parse(this.qc, file, offset, importedInfixes)
+		for (let [_path, file] of files) {
+			let [toplevels, _hereInfixExports] =
+				parse(this.qc, file, this.packageNameToPath, this.pathToFileDigest)
 			items.push(...toplevels)
-			mapInsert(infixExports, this.qc.getFile(file).path, hereInfixExports)
 		}
 
 		for (let item of items) {

@@ -305,6 +305,11 @@ export function indexOf<A>(i: Iterable<A>, x: A): number {
 	return -1
 }
 
+export function some<A>(i: Iterable<A>, f: (_: A) => boolean): boolean {
+	for (let x of i) if (f(x)) return true
+	return false
+}
+
 export function every<A>(i: Iterable<A>, f: (_: A) => boolean): boolean {
 	for (let x of i) if (!f(x)) return false
 	return true

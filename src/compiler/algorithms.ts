@@ -1,4 +1,4 @@
-import { error, indices, mkArray } from './util.ts'
+import { every, indices, mkArray } from './util.ts'
 
 export function* toposort<A>(
 	vertices: A[], edges: (_: A) => number[]): Iterable<A> {
@@ -20,16 +20,20 @@ enum DfsColor {
 	Grey,
 	Black,
 }
+export let cycleDetected = Symbol("cycle-detected")
 export function* toposortAcyclic<A>(
 	vertices: A[],
 	edges: (_: A) => number[],
 	reportCycles: boolean = true
-): Iterable<A> {
+): Iterable<A | typeof cycleDetected> {
 	let visited = mkArray(vertices.length, DfsColor.White)
 	let intermediateColor = reportCycles ? DfsColor.Grey : DfsColor.Black
-	function* go(i: number): Iterable<A> {
+	function* go(i: number): Iterable<A | typeof cycleDetected> {
 		if (visited[i] === DfsColor.Black) return
-		if (visited[i] === DfsColor.Grey) error("cycle detected")
+		if (visited[i] === DfsColor.Grey) {
+			yield cycleDetected
+			return
+		}
 		visited[i] = intermediateColor
 		let v = vertices[i]
 		for (let j of edges(v))
@@ -39,6 +43,13 @@ export function* toposortAcyclic<A>(
 	}
 	for (let i of indices(vertices))
 		yield* go(i)
+}
+
+export function isAcyclic<A>(
+	vertices: A[],
+	edges: (_: A) => number[],
+): boolean {
+	return every(toposortAcyclic(vertices, edges), x => x !== cycleDetected)
 }
 
 /*
