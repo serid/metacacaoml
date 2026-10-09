@@ -31,7 +31,7 @@ export const signalingNan = Symbol("signaling-NaN")
 export type HyperReal = number | typeof signalingNan
 
 export type InfixDecl = {
-	symbols: string,
+	opSequence: string,
 	associativity: string,
 	strength: HyperReal,
 	isMethod: boolean,
@@ -436,7 +436,7 @@ private expr(): Instr[] {
 	while (true) {
 		let span = this.i
 		let decl = find(chain(this.importedInfixes, this.exportedInfixes),
-			infixDecl => this.tryWord(infixDecl.symbols))
+			infixDecl => this.tryWord(infixDecl.opSequence))
 		if (decl === null) break
 
 		let strength = unsignalNaN(decl.strength, "operator precedence was NaN")
@@ -539,22 +539,22 @@ private toplevel(): Toplevel {
 		let strength: HyperReal = this.ieee754()
 
 		this.assertWord('"')
-		let symbols = this.stringLiteral('"')
+		let opSequence = this.stringLiteral('"')
 		this.assertWord("=")
 
 		this.assertWord('"')
 		let isMethod = this.tryWord(".")
 		let replacement = this.stringLiteral('"')
 
-		// assert(infixOperatorAnlautRule.test(firstStr(symbols)),
+		// assert(infixOperatorAnlautRule.test(firstStr(opSequence)),
 		// 	"an infix operator shall start with a symbol")
-		assert(every(symbols, c => infixOperatorInlautRule.test(c)),
+		assert(every(opSequence, c => infixOperatorInlautRule.test(c)),
 			"an infix operator shall contain no whitespace")
-		// assert(infixOperatorAuslautRule.test(lastStr(symbols)),
+		// assert(infixOperatorAuslautRule.test(lastStr(opSequence)),
 		// 	"an infix operator shall end with a symbol")
 
 		replacement = mangle(replacement)
-		let infix: InfixDecl = {symbols, associativity, strength, isMethod, replacement}
+		let infix: InfixDecl = {opSequence: opSequence, associativity, strength, isMethod, replacement}
 		this.exportedInfixes.push(infix)
 
 		return {tag: ToplevelTag.infixdecl, span: this.mkSpan(span), ...infix}
