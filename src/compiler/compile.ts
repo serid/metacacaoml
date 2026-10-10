@@ -1,6 +1,6 @@
 import { basename, join } from 'node:path'
 
-import { any, type ArrayMap, assert, chain, error, map, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, prettyPrint, range, toString, unexpectedMatch, unSingleton, write } from './util.ts'
+import { any, type ArrayMap, assert, chain, error, map, mapGet, mapInsert, nonExhaustiveMatch, type ObjectMap, type ObjectSet, prettyPrint, range, setContains, setSet, toString, unexpectedMatch, unSingleton, write } from './util.ts'
 
 import { toposort } from './algorithms.ts'
 import { ItemCodegen, RootCodegen } from './codegen.ts'
@@ -147,6 +147,7 @@ constructor(
 				"parse",
 				"assert-infix-import-acyclicity",
 				"get-toplevel-symbols",
+				"get-module-exported-symbols",
 			],
 			[
 				"file",
@@ -244,6 +245,10 @@ compile(): string {
 			this.itemCtxOfItemId.push(itemCtx)
 		}
 
+		// todo: use return value
+		// todo: nested modules
+		getModuleExportedSymbols(this.qc, this.src.rootMod.path, files.map(x=>x[1]), this.packageNameToPath, this.pathToFileDigest)
+
 		// Typecheck all
 		for (let itemCtx of this.itemCtxOfItemId) {
 			itemCtx.tyck.tyck()
@@ -323,4 +328,34 @@ export function getToplevelSymbols(qc: QueryCache, item: Digest): string[] {
 
 export function getToplevelSymbol(qc: QueryCache, item: Digest): string {
 	return unSingleton(getToplevelSymbols(qc, item))
+}
+
+function getModuleExportedSymbols0(
+	qc: QueryCache, modulePath: string, moduleFiles: Digest[],
+	packageNameToPath: ObjectMap<string>, pathToFileDigest: ObjectMap<Digest>
+): string[] {
+	let symbols: ObjectSet = Object.create(null)
+
+	for (let d of moduleFiles) {
+		let [ts, _infixExports] = parse(qc, d, packageNameToPath, pathToFileDigest)
+		for (let t of ts) {
+			let dt = qc.casAdd("item", t)
+			let moreSymbols = getToplevelSymbols(qc, dt)
+			for (let s of moreSymbols)
+				// We index into the set twice: once to check presence and another to add key if not present. Even JS set cannot fuse these into one.
+				if (setContains(symbols, s))
+					error(`Symbol "${s}" already declared in "${modulePath}`)
+				else
+					setSet(symbols, s)
+		}
+	}
+
+	return Object.keys(symbols)
+}
+
+export function getModuleExportedSymbols(
+	qc: QueryCache, modulePath: string, moduleFiles: Digest[],
+	packageNameToPath: ObjectMap<string>, pathToFileDigest: ObjectMap<Digest>
+): string[] {
+	return qc.getOrCompute("get-module-exported-symbols", [modulePath,moduleFiles, packageNameToPath, pathToFileDigest], getModuleExportedSymbols0)
 }
