@@ -17,28 +17,28 @@ export class CompileError extends Error {
 	}
 }
 
-export type PackageSource = { path: string, name: string, content: Module }
-export type Module = ObjectMap<ModuleEntry>
+export type PackageSource = { name: string, rootMod: Module }
+export type Module = { path: string, entries: ObjectMap<ModuleEntry> }
 export type ModuleEntry =
 	| { tag: "file", path: string, text: string }
-	| { tag: "module", path: string, entries: Module }
+	| { tag: "module", path: string, mod: Module }
 
-export async function readPackageSourceFromFs(dirPath: string): Promise<PackageSource> {
-	let name = basename(dirPath)
-	let content = await foldDirectory<Module>(dirPath, (files, directories) => {
+export async function readPackageSourceFromFs(rootPath: string): Promise<PackageSource> {
+	let name = basename(rootPath)
+	let rootMod = await foldDirectory<Module>(rootPath, (dirPath, files, directories) => {
 		let files1: Iterable<[string, ModuleEntry]> = map(files, ([path, name, text]) => [name, {
 			tag: "file",
 			path,
 			text
 		}])
-		let directories1: Iterable<[string, ModuleEntry]> = map(directories, ([path, name, entries]) => [name, {
+		let directories1: Iterable<[string, ModuleEntry]> = map(directories, ([path, name, mod]) => [name, {
 			tag: "module",
 			path,
-			entries
+			mod
 		}])
-		return Object.fromEntries(chain(files1, directories1))
+		return { path: dirPath, entries: Object.fromEntries(chain(files1, directories1)) }
 	})
-	return { path: dirPath, name, content }
+	return { name, rootMod }
 }
 
 export function resolveModPath(
@@ -109,6 +109,7 @@ private tyck: RootTyck = new RootTyck()
 private cg: RootCodegen = new RootCodegen()
 public qc: QueryCache
 private pathToFileDigest: ObjectMap<Digest> = Object.create(null)
+private pathToModuleFiles: ObjectMap<Digest[]> = Object.create(null)
 private packageNameToPath: ObjectMap<string> = Object.create(null)
 
 // key is itemid
@@ -121,18 +122,22 @@ constructor(
 	private logging: boolean) {
 		function go(m: Module,
 			pathToFileDigest: ObjectMap<Digest>,
+			pathToModuleFiles: ObjectMap<Digest[]>,
 			insertFile: (entry: { path: string, text: string }) => Digest,
 		): void {
-			for (let entry of Object.values(m)) {
+			let moduleFiles: Digest[] = []
+			for (let entry of Object.values(m.entries)) {
 				if (entry.tag === "module")
-					go(entry.entries, pathToFileDigest, insertFile)
+					go(entry.mod, pathToFileDigest, pathToModuleFiles, insertFile)
 				if (entry.tag !== "file") unexpectedMatch(entry.tag)
 
 				// File digest depends on path as file analysis is dependent on its path
 				// since it defines what names are available and is used in error messages
 				let d = insertFile({ path: entry.path, text: entry.text })
 				mapInsert(pathToFileDigest, entry.path, d)
+				moduleFiles.push(d)
 			}
+			mapInsert(pathToModuleFiles, m.path, moduleFiles)
 		}
 
 		this.qc = new QueryCache([
@@ -151,9 +156,9 @@ constructor(
 
 		let insertFile = (entry: { path: string, text: string }) =>
 			this.qc.casAdd("file", entry, entry.path)
-		go(src.content, this.pathToFileDigest, insertFile)
+		go(src.rootMod, this.pathToFileDigest, this.pathToModuleFiles, insertFile)
 
-		mapInsert(this.packageNameToPath, src.name, src.path)
+		mapInsert(this.packageNameToPath, src.name, src.rootMod.path)
 	}
 
 static makeItemNetwork(): Network {
