@@ -184,6 +184,10 @@ export function mapMap<A, B>(o: ObjectMap<A>, f: (_: A) => B): ObjectMap<B> {
 
 export interface ObjectSet{ [k: string]: any | undefined }
 
+export function setSet(o: ObjectSet, key: string | number): void {
+	mapSet(o, key, null)
+}
+
 export function setContains(o: ObjectSet, key: string): boolean {
 	return o[key] !== undefined
 }

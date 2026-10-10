@@ -236,7 +236,7 @@ compile(): string {
 		}
 
 		for (let item of items) {
-			let d = this.qc.casAdd("item", item, "@compile")
+			let d = this.qc.casAdd("item", item)
 			let itemCtx = new ItemCtx(
 				this, this.tyck, this.cg, Compiler.makeItemNetwork(), item, d)
 			for (let symbol of getToplevelSymbols(this.qc, d))

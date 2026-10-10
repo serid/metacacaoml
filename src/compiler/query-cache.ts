@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 
 import objectHash from './vendor/object-hash/object-hash.js'
 
-import { error, mapGet, mapInsertIfNotPresentP, mapSet, todo, view, write, type ObjectMap, type ObjectSet } from './util.ts'
+import { error, mapGet, mapInsertIfNotPresentP, setSet, todo, view, write, type ObjectMap, type ObjectSet } from './util.ts'
 
 export type BinaryString = string
 export type Digest = BinaryString
@@ -146,15 +146,18 @@ export class QueryCache {
 		return row[key] = f(this, ...args)
 	}
 
-	casAdd(type: string, o: any, label: string): Digest {
-		let d = `${digest(o)}-${label}`
+	casAdd(type: string, o: any, label?: string): Digest {
+		let d = digest(o)
+		if (label !== undefined)
+			d = `${d}-${label}`
 
 		// If an entry is already present at this key, keep its old value since
 		// it is equal to `o` (very very probably). We don't even bother comparing
 		// old and new value like hash cons does.
 		mapInsertIfNotPresentP(mapGet(this.cas, type), d, () => {
+			// console.log(`Adding to (${type}) CAS:`, JSON.stringify(o))
 			// Add gc root
-			mapSet(this.gcRoots, d, null)
+			setSet(this.gcRoots, d)
 			return o
 		})
 		return d
