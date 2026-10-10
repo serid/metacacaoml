@@ -358,6 +358,11 @@ export function join(i: Iterable<string>, sep=", "): string {
 }
 */
 
+export function mapInPlace(xs: any[], f: (_: any) => any): void {
+	for (let i of indices(xs))
+		xs[i] = f(xs[i])
+}
+
 
 export function* exceptionCauses(e: Error): Generator<Error, void, void> {
 	yield e

@@ -1,4 +1,4 @@
-import { assert, assertDefined, assertEq, assertL, assertNonNull, chain, error, every, find, Fuel, last, makeFraction, mapGet, nonExhaustiveMatch, range, toString, unexpectedMatch, unSingleton, view, type ObjectMap } from './util.ts'
+import { assert, assertDefined, assertEq, assertL, assertNonNull, chain, error, every, find, Fuel, last, makeFraction, mapGet, mapInPlace, nonExhaustiveMatch, range, toString, unexpectedMatch, unSingleton, view, type ObjectMap } from './util.ts'
 
 import { isAcyclic } from './algorithms.ts'
 import { mangle } from './codegen.ts'
@@ -641,20 +641,23 @@ function resolveImports(qc: QueryCache, file: Digest,
 }
 
 function parseFrom0(qc: QueryCache, file: Digest, offset: number,
-	importedInfixes: InfixDecl[]): [Toplevel[], InfixDecl[]] {
+	importedInfixes: InfixDecl[]): [Digest[], InfixDecl[]] {
 	let { path: _, text } = getFile(qc, file)
-	return new Syntax(file, text, importedInfixes, offset).parse()
+	let result: any = new Syntax(file, text, importedInfixes, offset).parse()
+	// replace toplevels in first field with their digests
+	mapInPlace(result[0], toplevel => qc.casAdd("item", toplevel))
+	return result
 }
 
 // Returns toplevels and exported infixes
 export function parseFrom(qc: QueryCache, file: Digest, offset: number,
-	importedInfixes: InfixDecl[]): [Toplevel[], InfixDecl[]] {
+	importedInfixes: InfixDecl[]): [Digest[], InfixDecl[]] {
 	return qc.getOrCompute("parse-from", [file, offset, importedInfixes], parseFrom0)
 }
 
 function parse0(qc: QueryCache, file: Digest,
 		packageNameToPath: ObjectMap<string>, pathToFileDigest: ObjectMap<Digest>
-		): [Toplevel[], InfixDecl[]] {
+		): [Digest[], InfixDecl[]] {
 	assertInfixImportAcyclicity(qc, packageNameToPath, pathToFileDigest)
 	let { il: _il, offset } = preparse(qc, file)
 	let resolvedImports =
@@ -675,7 +678,7 @@ function parse0(qc: QueryCache, file: Digest,
 // does not have a digest to put into the query system.
 export function parse(qc: QueryCache, file: Digest,
 		packageNameToPath: ObjectMap<string>, pathToFileDigest: ObjectMap<Digest>
-		): [Toplevel[], InfixDecl[]] {
+		): [Digest[], InfixDecl[]] {
 	return qc.getOrCompute("parse", [file, packageNameToPath, pathToFileDigest], parse0)
 }
 

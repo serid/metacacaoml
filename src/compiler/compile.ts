@@ -233,7 +233,7 @@ compile(): string {
 		for (let [_path, file] of files) {
 			let [toplevels, _hereInfixExports] =
 				parse(this.qc, file, this.packageNameToPath, this.pathToFileDigest)
-			items.push(...toplevels)
+			items.push(...toplevels.map(x=>this.qc.casGet("item", x)))
 		}
 
 		for (let item of items) {
@@ -338,16 +338,13 @@ function getModuleExportedSymbols0(
 
 	for (let d of moduleFiles) {
 		let [ts, _infixExports] = parse(qc, d, packageNameToPath, pathToFileDigest)
-		for (let t of ts) {
-			let dt = qc.casAdd("item", t)
-			let moreSymbols = getToplevelSymbols(qc, dt)
-			for (let s of moreSymbols)
+		for (let t of ts)
+			for (let s of getToplevelSymbols(qc, t))
 				// We index into the set twice: once to check presence and another to add key if not present. Even JS set cannot fuse these into one.
 				if (setContains(symbols, s))
 					error(`Symbol "${s}" already declared in "${modulePath}`)
 				else
 					setSet(symbols, s)
-		}
 	}
 
 	return Object.keys(symbols)
