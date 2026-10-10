@@ -581,8 +581,8 @@ parse(): [Toplevel[], InfixDecl[]] {
 
 // Parse beginning of file for imports
 // Refer to `Language.md` for module system
-preparse(): PreparseResult<ModPath> {
-	let infixImports: ModPath[] = []
+preparse(): PreparseResult<FullPath> {
+	let infixImports: FullPath[] = []
 	this.tryWhitespace()
 	while (this.tryWord("open")) {
 		let isInfix = this.tryWord("infix")
@@ -590,10 +590,10 @@ preparse(): PreparseResult<ModPath> {
 		// scans the whole foo:bar/baz/zap.meml
 		let pkgName = this.assertIdent()
 		this.assertWord(':')
-		let modPath = this.ident(pathInlautRule, pathInlautRule)
-		if (modPath === null)
+		let subPath = this.ident(pathInlautRule, pathInlautRule)
+		if (subPath === null)
 			throw new CompileError(this.mkSpan(this.i), 'expected path of form `foo:bar/baz/zap.meml`')
-		infixImports.push(`${pkgName}:${modPath}`)
+		infixImports.push(`${pkgName}:${subPath}`)
 	}
 	return { il: { infixImportFiles: infixImports }, offset: this.i }
 }
@@ -601,22 +601,22 @@ preparse(): PreparseResult<ModPath> {
 
 export type ImportList<Path> = {
 		// list of module-paths to files from which operators are imported
-		// of form ["pkgName", "bar/baz/zap.meml"]
+		// of form "pkgName:bar/baz/zap.meml"
 		infixImportFiles: Path[],
 }
 
 export type PreparseResult<Path> = { il: ImportList<Path>, offset: number}
 // pkgName:module/module/file.meml
-export type ModPath = string
+export type FullPath = string
 function preparse0(qc: QueryCache, file: Digest
-		): PreparseResult<ModPath> {
+		): PreparseResult<FullPath> {
 	let { path: _, text } = getFile(qc, file)
 	return new Syntax(file, text, [], 0).preparse()
 }
 
 // Returns imports and offset where to continue parsing
 export function preparse(qc: QueryCache, file: Digest
-		): PreparseResult<ModPath> {
+		): PreparseResult<FullPath> {
 	// Digest already available. Collapse ['hash'] to 'hash' and skip secondary rehashing.
 	return qc.getOrComputeKnownDigest("preparse", [file], file, preparse0)
 }
@@ -627,9 +627,9 @@ function resolveImports0(qc: QueryCache, file: Digest,
 	// todo: possibly merge into `preparse`
 
 	let { il, offset: _offset } = preparse(qc, file)
-	return il.infixImportFiles.map(modPath0 => {
-			let [pkgName, modPath] = modPath0.split(':')
-			let importPath = resolveModPath(packageNameToPath, pkgName, modPath)
+	return il.infixImportFiles.map(subPath0 => {
+			let [pkgName, subPath] = subPath0.split(':')
+			let importPath = resolveModPath(packageNameToPath, pkgName, subPath)
 			return { path: importPath, d: mapGet(pathToFileDigest, importPath) }
 		})
 }

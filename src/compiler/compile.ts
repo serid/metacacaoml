@@ -42,9 +42,9 @@ export async function readPackageSourceFromFs(dirPath: string): Promise<PackageS
 }
 
 export function resolveModPath(
-		packageNameToPath: ObjectMap<string>, pkgName: string, modPath: string
+		packageNameToPath: ObjectMap<string>, pkgName: string, subPath: string
 		): string {
-	return join(mapGet(packageNameToPath, pkgName), modPath)
+	return join(mapGet(packageNameToPath, pkgName), subPath)
 }
 
 export class ItemCtx {
